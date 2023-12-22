@@ -3,7 +3,7 @@
 import { Controller, Post, Body, Get, Param, Response } from '@nestjs/common';
 import { CreateAlbumDto } from './dto/create-album.dto';
 import { AlbumService } from './album.service';
-import
+import { ApiResponse } from '@nestjs/swagger';
 
 @Controller('albums')
 export class AlbumController {
