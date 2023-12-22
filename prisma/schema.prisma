@@ -1,4 +1,3 @@
-
 // Prisma schema for SoundHaven
 
 datasource db {
@@ -12,14 +11,15 @@ generator client {
 
 // User model
 model User {
-  id            Int       @id @default(autoincrement())
-  email         String    @unique
-  password      String
-  name          String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  playlists     Playlist[]
-  followedArtists Artist[] @relation("UserFollowsArtist")
+  id              Int            @id @default(autoincrement())
+  email           String         @unique
+  password        String
+  name            String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  playlists       Playlist[]
+  followedArtists Artist[]       @relation("UserFollowsArtist")
+  refreshTokens   RefreshToken[]
 }
 
 // For storing refresh tokens
@@ -33,56 +33,62 @@ model RefreshToken {
 
 // Artist model
 model Artist {
-  id            Int       @id @default(autoincrement())
-  name          String
-  bio           String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  albums        Album[]
-  followers     User[]    @relation("UserFollowsArtist")
+  id        Int      @id @default(autoincrement())
+  name      String
+  bio       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  albums    Album[]
+  followers User[]   @relation("UserFollowsArtist")
 }
 
 // Album model
 model Album {
-  id            Int       @id @default(autoincrement())
-  title         String
-  releaseDate   DateTime
-  artistId      Int
-  artist        Artist    @relation(fields: [artistId], references: [id])
-  tracks        Track[]
+  id          Int      @id @default(autoincrement())
+  title       String
+  releaseDate DateTime
+  artistId    Int
+  artist      Artist   @relation(fields: [artistId], references: [id])
+  tracks      Track[]
 }
 
 // Track model
 model Track {
-  id            Int       @id @default(autoincrement())
-  title         String
-  duration      Int       // Duration in seconds
-  albumId       Int?
-  album         Album?    @relation(fields: [albumId], references: [id])
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               Int                @id @default(autoincrement())
+  title            String
+  duration         Int // Duration in seconds
+  albumId          Int?
+  album            Album?             @relation(fields: [albumId], references: [id])
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  playlists        Playlist[]         @relation("TracksInPlaylist")
+  genres           Genre[]            @relation("TracksInGenre")
+  TracksInPlaylist TracksInPlaylist[]
+  TracksInGenre    TracksInGenre[]
 }
 
 // Playlist model
 model Playlist {
-  id            Int       @id @default(autoincrement())
-  title         String
-  description   String?
-  userId        Int
-  user          User      @relation(fields: [userId], references: [id])
-  tracks        Track[]   @relation("TracksInPlaylist")
+  id               Int                @id @default(autoincrement())
+  title            String
+  description      String?
+  userId           Int
+  user             User               @relation(fields: [userId], references: [id])
+  tracks           Track[]            @relation("TracksInPlaylist")
+  TracksInPlaylist TracksInPlaylist[]
 }
 
 // Genre model
 model Genre {
-  id            Int       @id @default(autoincrement())
-  name          String    @unique
-  tracks        Track[]   @relation("TracksInGenre")
+  id            Int             @id @default(autoincrement())
+  name          String          @unique
+  tracks        Track[]         @relation("TracksInGenre")
+  TracksInGenre TracksInGenre[]
 }
 
 // Many-to-Many relation between Tracks and Playlists
 model TracksInPlaylist {
-  track   Track   @relation(fields: [trackId], references: [id])
+  track   Track @relation(fields: [trackId], references: [id])
   trackId Int
 
   playlist   Playlist @relation(fields: [playlistId], references: [id])
@@ -93,10 +99,10 @@ model TracksInPlaylist {
 
 // Many-to-Many relation between Tracks and Genres
 model TracksInGenre {
-  track   Track   @relation(fields: [trackId], references: [id])
+  track   Track @relation(fields: [trackId], references: [id])
   trackId Int
 
-  genre   Genre   @relation(fields: [genreId], references: [id])
+  genre   Genre @relation(fields: [genreId], references: [id])
   genreId Int
 
   @@id([trackId, genreId])

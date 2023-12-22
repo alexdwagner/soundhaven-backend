@@ -1,8 +1,8 @@
 // src/auth/auth.service.ts
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { UserService } from 'src/user/user.service';
 import * as bcrypt from 'bcrypt';
 
@@ -16,7 +16,7 @@ export class AuthService {
 
   async validateUser(email: string, pass: string): Promise<any> {
     const user = await this.userService.findUserByEmail(email);
-    if (user && await bcrypt.compare(pass, user.password)) {
+    if (user && (await bcrypt.compare(pass, user.password))) {
       const { password, ...result } = user;
       return result;
     }
@@ -28,16 +28,24 @@ export class AuthService {
     return {
       access_token: this.jwtService.sign(payload),
       refresh_token: this.jwtService.sign(payload, {
-        expiresIn: '7d' // Set longer expiration for refresh token
+        expiresIn: '7d', // Set longer expiration for refresh token
       }),
     };
   }
 
+  async generateAccessToken(user: any) {
+    const payload = { email: user.email, sub: user.id };
+    return this.jwtService.sign(payload);
+  }
+
   async generateRefreshToken(user: any) {
-    const refreshToken = this.jwtService.sign({}, {
-      secret: 'refresh-secret', // Use a different secret or load from .env
-      expiresIn: '7d',
-    });
+    const refreshToken = this.jwtService.sign(
+      {},
+      {
+        secret: 'refresh-secret', // Use a different secret or load from .env
+        expiresIn: '7d',
+      },
+    );
 
     await this.prisma.refreshToken.create({
       data: {

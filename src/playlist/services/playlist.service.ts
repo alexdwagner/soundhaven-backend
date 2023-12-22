@@ -1,8 +1,8 @@
 // src/playlist/playlist.service.ts
 
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreatePlaylistDto } from './dto/create-playlist.dto';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { CreatePlaylistDto } from '../dto/create-playlist.dto';
 
 @Injectable()
 export class PlaylistService {

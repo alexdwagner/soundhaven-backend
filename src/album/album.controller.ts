@@ -1,6 +1,6 @@
 // src/album/album.controller.ts
 
-import { Controller, Post, Body, Get, Param, Response } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param } from '@nestjs/common';
 import { CreateAlbumDto } from './dto/create-album.dto';
 import { AlbumService } from './album.service';
 import { ApiResponse } from '@nestjs/swagger';

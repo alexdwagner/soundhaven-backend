@@ -1,8 +1,8 @@
 // src/track/track.controller.ts
 
 import { Controller, Post, UseGuards, Get, Patch, Delete, Param, Body } from '@nestjs/common';
-import { TrackService } from './track.service';
-import { CreateTrackDto } from './dto/create-track.dto';
+import { TrackService } from '../services/track.service';
+import { CreateTrackDto } from '../dto/create-track.dto';
 import { AuthGuard } from '@nestjs/passport';
 
 @Controller('tracks')

@@ -1,15 +1,22 @@
 import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
+import { UserService } from 'src/user/user.service';
 import { CreateUserDto } from '../../user/dto/create-user.dto';
 import { LoginDto } from '../dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private userService: UserService
+  ) { }
 
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
-    // Handle user registration
+    const user = await this.userService.createUser(createUserDto);
+    // Optionally, you can generate a token for the user right after registration
+    const access_token = await this.authService.generateAccessToken(user);
+    return { user, access_token };
   }
 
   @Post('login')
@@ -22,10 +29,7 @@ export class AuthController {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return {
-      access_token: await this.authService.generateAccessToken(user),
-      refresh_token: await this.authService.generateRefreshToken(user),
-    };
+    return this.authService.login(user);
   }
 
   @Post('logout')
