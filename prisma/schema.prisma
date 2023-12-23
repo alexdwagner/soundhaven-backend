@@ -65,6 +65,7 @@ model Track {
   genres           Genre[]            @relation("TracksInGenre")
   TracksInPlaylist TracksInPlaylist[]
   TracksInGenre    TracksInGenre[]
+  filePath String?
 }
 
 // Playlist model

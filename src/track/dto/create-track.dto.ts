@@ -7,9 +7,13 @@ export class CreateTrackDto {
   title: string;
 
   @IsInt()
-  duration: number;
+  @IsOptional()
+  duration?: number; // Make duration optional
 
   @IsInt()
   @IsOptional()
   albumId?: number;
+
+  // File is not validated here as it's handled by Multer, but included for structure
+  file?: Express.Multer.File;
 }
