@@ -74,7 +74,7 @@ export class TrackService {
       durationInSeconds = parseInt(trackMetadata.duration, 10) || null;
     }
 
-    // Ensure albumId is a number
+    // Ensure albumId is a number. Poop
     let validAlbumId = null;
     if (trackMetadata.albumId) {
       const parsedAlbumId = parseInt(trackMetadata.albumId, 10);
