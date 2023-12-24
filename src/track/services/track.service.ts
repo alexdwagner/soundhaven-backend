@@ -1,24 +1,38 @@
 // src/track/track.service.ts
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTrackDto } from './../dto/create-track.dto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Express } from 'express';
+import * as musicMetadata from 'music-metadata';
 
 @Injectable()
 export class TrackService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+    console.log('TrackService instantiated');
+  }
+
+  async getAllTracks() {
+    console.log('Service: Fetching all tracks');
+    return this.prisma.track.findMany();
+  }
 
   async createTrack(createTrackDto: CreateTrackDto) {
+    // Parse duration and albumId to integers, or use null if parsing fails
+    const duration = createTrackDto.duration
+      ? parseInt(createTrackDto.duration, 10)
+      : null;
+    const albumId = createTrackDto.albumId
+      ? parseInt(createTrackDto.albumId, 10)
+      : null;
+
     const trackData = {
       title: createTrackDto.title,
-      duration: createTrackDto.duration,
-      album: createTrackDto.albumId
-        ? { connect: { id: createTrackDto.albumId } }
-        : undefined,
+      duration: !isNaN(duration) ? duration : null, // Use parsed value or null
+      albumId: !isNaN(albumId) ? albumId : null, // Use parsed value or null
       // other fields
     };
 
@@ -32,39 +46,61 @@ export class TrackService {
       where: { id: Number(id) },
     });
   }
+
   async saveUploadedTrack(
     file: Express.Multer.File,
     trackMetadata: CreateTrackDto,
-  ) {
+  ): Promise<{ filePath: string }> {
     // Define the upload path
     const uploadPath = process.env.UPLOAD_PATH || 'uploads';
-
-    // Ensure the upload directory exists
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
 
-    // Generate a unique filename for the uploaded file
     const filename = `${Date.now()}-${file.originalname}`;
     const filePath = path.join(uploadPath, filename);
-
-    // Save the file to the filesystem
     fs.writeFileSync(filePath, file.buffer);
 
-    // Construct trackData for Prisma
+    let durationInSeconds = null;
+    let title = trackMetadata.title;
+
+    try {
+      const metadata = await musicMetadata.parseBuffer(file.buffer, file.mimetype);
+      durationInSeconds = metadata.format.duration; // Extracted duration in seconds
+      title = title || metadata.common.title; // Use provided title or extract from metadata
+    } catch (error) {
+      console.error('Error extracting metadata:', error);
+      // Fallback to provided duration if metadata extraction fails
+      durationInSeconds = parseInt(trackMetadata.duration, 10) || null;
+    }
+
+    // Ensure albumId is a number
+    let validAlbumId = null;
+    if (trackMetadata.albumId) {
+      const parsedAlbumId = parseInt(trackMetadata.albumId, 10);
+      if (!isNaN(parsedAlbumId)) {
+        const album = await this.prisma.album.findUnique({
+          where: { id: parsedAlbumId }
+        });
+        if (album) {
+          validAlbumId = parsedAlbumId;
+        }
+      }
+    }
+
     const trackData = {
-      title: trackMetadata.title,
-      duration: trackMetadata.duration,
-      ...(trackMetadata.albumId && {
-        album: { connect: { id: trackMetadata.albumId } },
-      }),
-      filePath: filePath, // Storing the path to the file
-      // Note: Exclude relations and auto-handled fields
+      title: title,
+      duration: durationInSeconds,
+      albumId: validAlbumId,
+      filePath: filePath,
     };
 
-    // Create and save the track record in the database
-    return this.prisma.track.create({
-      data: trackData,
-    });
+    try {
+      await this.prisma.track.create({ data: trackData });
+      return { filePath };
+    } catch (error) {
+      console.error('Error in saveUploadedTrack:', error);
+      throw new HttpException('Failed to upload track', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }

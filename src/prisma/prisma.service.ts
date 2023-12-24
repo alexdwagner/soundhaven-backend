@@ -79,8 +79,16 @@ export class PrismaService extends PrismaClient {
 
   // Seed database with initial data
   async seedDatabase() {
-    const genreData = [{ name: 'Rock' }, { name: 'Jazz' }, /* ... more genres ... */];
-    const artistData = [{ name: 'Artist One', bio: 'Bio of Artist One' }, /* ... more artists ... */];
+    const genreData = [
+      { name: 'Rock' },
+      { name: 'Jazz' } /* ... more genres ... */,
+    ];
+    const artistData = [
+      {
+        name: 'Artist One',
+        bio: 'Bio of Artist One',
+      } /* ... more artists ... */,
+    ];
 
     await this.$transaction(async (prisma) => {
       for (const genre of genreData) {

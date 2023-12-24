@@ -12,6 +12,8 @@ import {
   UploadedFile,
   UseInterceptors,
   Req,
+  HttpStatus,
+  HttpException,
 } from '@nestjs/common';
 import { TrackService } from '../services/track.service';
 import { CreateTrackDto } from '../dto/create-track.dto';
@@ -23,7 +25,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 export class TrackController {
   constructor(private readonly trackService: TrackService) {}
 
-  @UseGuards(AuthGuard('jwt'))
+  // @UseGuards(AuthGuard('jwt'))
   @Post()
   async createTrack(@Body() createTrackDto: CreateTrackDto) {
     return this.trackService.createTrack(createTrackDto);
@@ -34,14 +36,28 @@ export class TrackController {
     return this.trackService.getTrackById(id);
   }
 
+  @Get()
+  async getAllTracks() {
+    try {
+      return this.trackService.getAllTracks();
+    } catch (error) {
+      console.error('Error fetching tracks:', error);
+      throw new HttpException('Failed to fetch tracks', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   @Post('upload')
-  @UseGuards(AuthGuard('jwt'))
+  // @UseGuards(AuthGuard('jwt'))
   @UseInterceptors(FileInterceptor('file'))
   async uploadTrack(
     @UploadedFile() file: Express.Multer.File,
     @Body() trackMetadata: CreateTrackDto,
   ) {
-    // The file and metadata are sent separately to the service method.
-    return this.trackService.saveUploadedTrack(file, trackMetadata);
+    console.log('Upload request received with file:', file?.originalname);
+    const { filePath } = await this.trackService.saveUploadedTrack(
+      file,
+      trackMetadata,
+    );
+    return { message: 'File uploaded successfully', filePath };
   }
 }

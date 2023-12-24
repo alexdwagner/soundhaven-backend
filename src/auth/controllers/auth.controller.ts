@@ -8,8 +8,8 @@ import { LoginDto } from '../dto/login.dto';
 export class AuthController {
   constructor(
     private authService: AuthService,
-    private userService: UserService
-  ) { }
+    private userService: UserService,
+  ) {}
 
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
