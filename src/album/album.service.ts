@@ -3,6 +3,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAlbumDto } from './dto/create-album.dto';
+import { UpdateAlbumDto } from './dto/update-album.dto';
 
 @Injectable()
 export class AlbumService {
@@ -20,5 +21,10 @@ export class AlbumService {
     });
   }
 
-  // Add other methods as needed
+  async updateAlbum(id: string, updateAlbumDto: UpdateAlbumDto) {
+    return this.prisma.album.update({
+      where: { id: Number(id) },
+      data: updateAlbumDto,
+    });
+  }
 }

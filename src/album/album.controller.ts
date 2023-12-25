@@ -1,7 +1,8 @@
 // src/album/album.controller.ts
 
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Patch, Param } from '@nestjs/common';
 import { CreateAlbumDto } from './dto/create-album.dto';
+import { UpdateAlbumDto } from './dto/update-album.dto';
 import { AlbumService } from './album.service';
 import { ApiResponse } from '@nestjs/swagger';
 
@@ -23,5 +24,8 @@ export class AlbumController {
     return this.albumService.getAlbumById(id);
   }
 
-  // Add other endpoints as needed
+  @Patch(':id')
+  async updateAlbum(@Param('id') id: string, @Body() updateAlbumDto: UpdateAlbumDto) {
+    return this.albumService.updateAlbum(id, updateAlbumDto);
+  }
 }

@@ -4,6 +4,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTrackDto } from './../dto/create-track.dto';
+import { UpdateTrackDto } from '../dto/update-track.dto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Express } from 'express';
@@ -74,7 +75,7 @@ export class TrackService {
       durationInSeconds = parseInt(trackMetadata.duration, 10) || null;
     }
 
-    // Ensure albumId is a number. Poop
+    // Ensure albumId is a number.
     let validAlbumId = null;
     if (trackMetadata.albumId) {
       const parsedAlbumId = parseInt(trackMetadata.albumId, 10);
@@ -102,5 +103,27 @@ export class TrackService {
       console.error('Error in saveUploadedTrack:', error);
       throw new HttpException('Failed to upload track', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  async deleteTrack(id: string) {
+    await this.prisma.track.delete({
+      where: {
+        id: Number(id)
+      }
+    });
+
+    return { message: 'Track deleted successfully' };
+  }
+
+  async updateTrack(id: string, updateTrackDto: UpdateTrackDto) {
+    const updateData = {
+      ...updateTrackDto,
+      // Handle albumId if it's provided
+      album: updateTrackDto.albumId ? { connect: { id: updateTrackDto.albumId } } : undefined,
+    };
+    return this.prisma.track.update({
+      where: { id: Number(id) },
+      data: updateData,
+    });
   }
 }

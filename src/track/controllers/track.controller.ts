@@ -17,13 +17,14 @@ import {
 } from '@nestjs/common';
 import { TrackService } from '../services/track.service';
 import { CreateTrackDto } from '../dto/create-track.dto';
+import { UpdateTrackDto } from '../dto/update-track.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('tracks')
 export class TrackController {
-  constructor(private readonly trackService: TrackService) {}
+  constructor(private readonly trackService: TrackService) { }
 
   // @UseGuards(AuthGuard('jwt'))
   @Post()
@@ -60,4 +61,16 @@ export class TrackController {
     );
     return { message: 'File uploaded successfully', filePath };
   }
+
+
+  @Delete(':id')
+  async deleteTrack(@Param('id') id: string) {
+    return this.trackService.deleteTrack(id);
+  }
+
+  @Patch(':id')
+  async updateTrack(@Param('id') id: string, @Body() updateTrackDto: UpdateTrackDto) {
+    return this.trackService.updateTrack(id, updateTrackDto);
 }
+}
+
