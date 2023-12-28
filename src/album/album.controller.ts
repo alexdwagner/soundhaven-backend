@@ -25,7 +25,10 @@ export class AlbumController {
   }
 
   @Patch(':id')
-  async updateAlbum(@Param('id') id: string, @Body() updateAlbumDto: UpdateAlbumDto) {
+  async updateAlbum(
+    @Param('id') id: string,
+    @Body() updateAlbumDto: UpdateAlbumDto,
+  ) {
     return this.albumService.updateAlbum(id, updateAlbumDto);
   }
 }

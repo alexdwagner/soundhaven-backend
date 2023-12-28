@@ -1,7 +1,6 @@
 // src/track/track.service.ts
 
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTrackDto } from './../dto/create-track.dto';
 import { UpdateTrackDto } from '../dto/update-track.dto';
@@ -66,7 +65,10 @@ export class TrackService {
     let title = trackMetadata.title;
 
     try {
-      const metadata = await musicMetadata.parseBuffer(file.buffer, file.mimetype);
+      const metadata = await musicMetadata.parseBuffer(
+        file.buffer,
+        file.mimetype,
+      );
       durationInSeconds = metadata.format.duration; // Extracted duration in seconds
       title = title || metadata.common.title; // Use provided title or extract from metadata
     } catch (error) {
@@ -81,7 +83,7 @@ export class TrackService {
       const parsedAlbumId = parseInt(trackMetadata.albumId, 10);
       if (!isNaN(parsedAlbumId)) {
         const album = await this.prisma.album.findUnique({
-          where: { id: parsedAlbumId }
+          where: { id: parsedAlbumId },
         });
         if (album) {
           validAlbumId = parsedAlbumId;
@@ -101,29 +103,48 @@ export class TrackService {
       return { filePath };
     } catch (error) {
       console.error('Error in saveUploadedTrack:', error);
-      throw new HttpException('Failed to upload track', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Failed to upload track',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
   async deleteTrack(id: string) {
     await this.prisma.track.delete({
       where: {
-        id: Number(id)
-      }
+        id: Number(id),
+      },
     });
 
     return { message: 'Track deleted successfully' };
   }
 
   async updateTrack(id: string, updateTrackDto: UpdateTrackDto) {
-    const updateData = {
-      ...updateTrackDto,
-      // Handle albumId if it's provided
-      album: updateTrackDto.albumId ? { connect: { id: updateTrackDto.albumId } } : undefined,
-    };
-    return this.prisma.track.update({
-      where: { id: Number(id) },
-      data: updateData,
-    });
+    try {
+      const updateData = {
+        title: updateTrackDto.title,
+        // other fields like filePath, etc. if needed
+        artist: updateTrackDto.artistId
+          ? { connect: { id: Number(updateTrackDto.artistId) } }
+          : undefined,
+        album: updateTrackDto.albumId
+          ? { connect: { id: Number(updateTrackDto.albumId) } }
+          : undefined,
+      };
+
+      const updatedTrack = await this.prisma.track.update({
+        where: { id: Number(id) },
+        data: updateData,
+      });
+
+      return updatedTrack;
+    } catch (error) {
+      console.error('Error updating track:', error);
+      throw new HttpException(
+        'Failed to update track',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

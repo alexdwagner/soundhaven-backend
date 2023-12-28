@@ -24,7 +24,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('tracks')
 export class TrackController {
-  constructor(private readonly trackService: TrackService) { }
+  constructor(private readonly trackService: TrackService) {}
 
   // @UseGuards(AuthGuard('jwt'))
   @Post()
@@ -43,7 +43,10 @@ export class TrackController {
       return this.trackService.getAllTracks();
     } catch (error) {
       console.error('Error fetching tracks:', error);
-      throw new HttpException('Failed to fetch tracks', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Failed to fetch tracks',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -62,15 +65,16 @@ export class TrackController {
     return { message: 'File uploaded successfully', filePath };
   }
 
-
   @Delete(':id')
   async deleteTrack(@Param('id') id: string) {
     return this.trackService.deleteTrack(id);
   }
 
   @Patch(':id')
-  async updateTrack(@Param('id') id: string, @Body() updateTrackDto: UpdateTrackDto) {
+  async updateTrack(
+    @Param('id') id: string,
+    @Body() updateTrackDto: UpdateTrackDto,
+  ) {
     return this.trackService.updateTrack(id, updateTrackDto);
+  }
 }
-}
-

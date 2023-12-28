@@ -40,6 +40,7 @@ model Artist {
   updatedAt DateTime @updatedAt
   albums    Album[]
   followers User[]   @relation("UserFollowsArtist")
+  tracks     Track[]
 }
 
 // Album model
@@ -57,6 +58,8 @@ model Track {
   id               Int                @id @default(autoincrement())
   title            String
   duration         Int // Duration in seconds
+  artistId         Int?
+  artist           Artist? @relation(fields: [artistId], references: [id])
   albumId          Int?
   album            Album?             @relation(fields: [albumId], references: [id])
   createdAt        DateTime           @default(now())
