@@ -20,6 +20,7 @@ model User {
   playlists       Playlist[]
   followedArtists Artist[]       @relation("UserFollowsArtist")
   refreshTokens   RefreshToken[]
+  comments Comment[]
 }
 
 // For storing refresh tokens
@@ -69,6 +70,7 @@ model Track {
   TracksInPlaylist TracksInPlaylist[]
   TracksInGenre    TracksInGenre[]
   filePath String?
+  comments Comment[]
 }
 
 // Playlist model
@@ -110,4 +112,15 @@ model TracksInGenre {
   genreId Int
 
   @@id([trackId, genreId])
+}
+
+// Comment model
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  trackId   Int
+  track     Track    @relation(fields: [trackId], references: [id])
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
 }
