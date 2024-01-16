@@ -10,11 +10,11 @@ import { ApiResponse } from '@nestjs/swagger';
 export class AlbumController {
   constructor(private readonly albumService: AlbumService) {}
 
-  @Post()
-  @ApiResponse({ status: 201, description: 'Album successfully created.' })
-  @ApiResponse({ status: 400, description: 'Bad Request.' })
-  async createAlbum(@Body() createAlbumDto: CreateAlbumDto) {
-    return this.albumService.createAlbum(createAlbumDto);
+  @Get()
+  @ApiResponse({ status: 200, description: 'All albums retrieved.' })
+  @ApiResponse({ status: 404, description: 'No albums found.' })
+  async getAllAlbums() {
+    return this.albumService.getAllAlbums();
   }
 
   @Get(':id')
@@ -22,6 +22,13 @@ export class AlbumController {
   @ApiResponse({ status: 404, description: 'Album not found.' })
   async getAlbumById(@Param('id') id: string) {
     return this.albumService.getAlbumById(id);
+  }
+
+  @Post()
+  @ApiResponse({ status: 201, description: 'Album successfully created.' })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  async createAlbum(@Body() createAlbumDto: CreateAlbumDto) {
+    return this.albumService.createAlbum(createAlbumDto);
   }
 
   @Patch(':id')

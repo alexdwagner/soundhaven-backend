@@ -42,6 +42,15 @@ export class UserService {
     const user = await this.prisma.user.findUnique({
       where: { id: Number(id) },
     });
-    return { id: user.id.toString(), email: user.email, name: user.name };
+
+    if (!user) {
+      throw new Error('User not found'); // Or handle this case as needed
+    }
+
+    return {
+      id: user.id.toString(),
+      email: user.email,
+      name: user.name || 'Default Name',
+    }; // Provide a default name if null
   }
 }

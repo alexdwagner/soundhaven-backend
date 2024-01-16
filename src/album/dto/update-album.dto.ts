@@ -1,3 +1,3 @@
 export class UpdateAlbumDto {
-  title?: string;
+  name?: string;
 }

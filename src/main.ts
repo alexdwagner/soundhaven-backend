@@ -16,7 +16,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('SoundHaven API')
-    .setDescription('The SoundHaven API description')
+    .setDescription('Backend app for Soundhaven')
     .setVersion('1.0')
     .addTag('soundhaven')
     .build();

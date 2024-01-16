@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UserService } from 'src/user/user.service';
 import * as bcrypt from 'bcrypt';
+import { User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -14,9 +15,13 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, pass: string): Promise<any> {
+  async validateUser(
+    email: string,
+    pass: string,
+  ): Promise<Omit<User, 'password'> | null> {
     const user = await this.userService.findUserByEmail(email);
     if (user && (await bcrypt.compare(pass, user.password))) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, ...result } = user;
       return result;
     }
@@ -72,6 +77,12 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: storedToken.userId },
     });
+
+    if (!user) {
+      throw new UnauthorizedException(
+        'User not found for the provided refresh token.',
+      );
+    }
 
     return this.jwtService.sign({ email: user.email, sub: user.id });
   }

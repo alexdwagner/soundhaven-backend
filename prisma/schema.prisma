@@ -46,7 +46,7 @@ model Artist {
 // Album model
 model Album {
   id          Int      @id @default(autoincrement())
-  title       String
+  name        String   
   releaseDate DateTime
   artistId    Int
   artist      Artist   @relation(fields: [artistId], references: [id])
@@ -56,7 +56,7 @@ model Album {
 // Track model
 model Track {
   id               Int                @id @default(autoincrement())
-  title            String
+  name             String   @db.VarChar(255)  
   duration         Int // Duration in seconds
   artistId         Int?
   artist           Artist? @relation(fields: [artistId], references: [id])
@@ -74,7 +74,7 @@ model Track {
 // Playlist model
 model Playlist {
   id               Int                @id @default(autoincrement())
-  title            String
+  name            String
   description      String?
   userId           Int
   user             User               @relation(fields: [userId], references: [id])

@@ -4,10 +4,15 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAlbumDto } from './dto/create-album.dto';
 import { UpdateAlbumDto } from './dto/update-album.dto';
+import { ApiResponse } from '@nestjs/swagger';
 
 @Injectable()
 export class AlbumService {
   constructor(private prisma: PrismaService) {}
+
+  async getAllAlbums() {
+    return this.prisma.album.findMany();
+  }
 
   async createAlbum(createAlbumDto: CreateAlbumDto) {
     return this.prisma.album.create({

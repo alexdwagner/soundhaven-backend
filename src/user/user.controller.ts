@@ -1,5 +1,3 @@
-// src/user/user.controller.ts
-
 import {
   Controller,
   Post,
@@ -8,12 +6,14 @@ import {
   Get,
   Param,
   UseGuards,
-  Request,
+  Req,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
+import { UnauthorizedException } from '@nestjs/common';
 
 @Controller('users')
 export class UserController {
@@ -37,11 +37,14 @@ export class UserController {
     return this.userService.findUserByEmail(email);
   }
 
-  // In UserController
-
   @UseGuards(AuthGuard('jwt'))
   @Get('profile')
-  async getUserProfile(@Request() req) {
-    return this.userService.getUserById(req.user.userId);
+  async getUserProfile(@Req() req: Request) {
+    // Adjust the type assertion
+    const user = req.user as { id: string; email: string; name?: string };
+    if (!user) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    return this.userService.getUserById(user.id); // Use 'id' instead of 'userId'
   }
 }

@@ -5,7 +5,7 @@ export class CreateAlbumDto {
   @ApiProperty({ description: 'Title of the album' })
   @IsNotEmpty()
   @IsString()
-  title: string;
+  name: string;
 
   @ApiProperty({
     description: 'Release date of the album',

@@ -4,7 +4,7 @@ import { IsString, IsInt, IsOptional } from 'class-validator';
 
 export class CreatePlaylistDto {
   @IsString()
-  title: string;
+  name: string;
 
   @IsString()
   @IsOptional()

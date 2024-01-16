@@ -1,10 +1,10 @@
 // src/track/dto/create-track.dto.ts
 
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNumber } from 'class-validator';
 
 export class CreateTrackDto {
   @IsString()
-  title: string;
+  name: string;
 
   @IsString()
   @IsOptional()
@@ -13,4 +13,22 @@ export class CreateTrackDto {
   @IsString()
   @IsOptional()
   albumId?: string; // Accept albumId as a string
+
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  genres?: number[]; // Array of genre IDs
+
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  playlists?: number[]; // Array of playlist IDs
+
+  @IsString()
+  @IsOptional()
+  artistId?: string; // Accept artistId as a string
+
+  @IsString()
+  @IsOptional()
+  filePath?: string; // Accept filePath as a string
 }

@@ -43,7 +43,7 @@ export class PrismaService extends PrismaClient {
 
   // Album Model Methods
   async createAlbum(data: {
-    title: string;
+    name: string;
     releaseDate: Date;
     artistId: number;
   }) {
@@ -61,7 +61,7 @@ export class PrismaService extends PrismaClient {
   // Playlist Model Methods
   async createPlaylistForUser(
     userId: number,
-    data: { title: string; description?: string },
+    data: { name: string; description?: string },
   ) {
     return this.playlist.create({
       data: {

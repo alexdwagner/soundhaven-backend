@@ -1,6 +1,7 @@
 // src/track/track.service.ts
 
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTrackDto } from './../dto/create-track.dto';
 import { UpdateTrackDto } from '../dto/update-track.dto';
@@ -21,24 +22,46 @@ export class TrackService {
   }
 
   async createTrack(createTrackDto: CreateTrackDto) {
-    // Parse duration and albumId to integers, or use null if parsing fails
-    const duration = createTrackDto.duration
-      ? parseInt(createTrackDto.duration, 10)
-      : null;
-    const albumId = createTrackDto.albumId
-      ? parseInt(createTrackDto.albumId, 10)
-      : null;
+    // Check if properties are defined and parse them to integers, or provide default values
+    const duration =
+      createTrackDto.duration !== undefined
+        ? parseInt(createTrackDto.duration, 10)
+        : 0;
+    const albumId =
+      createTrackDto.albumId !== undefined
+        ? parseInt(createTrackDto.albumId, 10)
+        : null;
+    const artistId =
+      createTrackDto.artistId !== undefined
+        ? parseInt(createTrackDto.artistId, 10)
+        : null;
 
-    const trackData = {
-      title: createTrackDto.title,
-      duration: !isNaN(duration) ? duration : null, // Use parsed value or null
-      albumId: !isNaN(albumId) ? albumId : null, // Use parsed value or null
-      // other fields
+    const trackData: Prisma.TrackCreateInput = {
+      name: createTrackDto.name || 'Unnamed Track',
+      duration, // Handled to be number or default 0
+      artist: artistId ? { connect: { id: artistId } } : undefined,
+      album: albumId ? { connect: { id: albumId } } : undefined,
+      filePath: createTrackDto.filePath,
+      genres:
+        createTrackDto.genres && createTrackDto.genres.length > 0
+          ? {
+              connect: createTrackDto.genres.map((genreId) => ({
+                id: genreId,
+              })),
+            }
+          : undefined,
+
+      playlists:
+        createTrackDto.playlists && createTrackDto.playlists.length > 0
+          ? {
+              connect: createTrackDto.playlists.map((playlistId) => ({
+                id: playlistId,
+              })),
+            }
+          : undefined,
     };
 
-    return this.prisma.track.create({
-      data: trackData,
-    });
+    return this.prisma.track.create({ data: trackData });
   }
 
   async getTrackById(id: string) {
@@ -61,41 +84,35 @@ export class TrackService {
     const filePath = path.join(uploadPath, filename);
     fs.writeFileSync(filePath, file.buffer);
 
-    let durationInSeconds = null;
-    let title = trackMetadata.title;
+    let durationInSeconds: number | null = null;
+    let name = trackMetadata.name || 'Unnamed Track'; // Default name if not provided
 
     try {
       const metadata = await musicMetadata.parseBuffer(
         file.buffer,
-        file.mimetype,
+        file.mimetype || 'audio/mpeg', // Default mimetype if undefined
       );
-      durationInSeconds = metadata.format.duration; // Extracted duration in seconds
-      title = title || metadata.common.title; // Use provided title or extract from metadata
+      durationInSeconds = metadata.format.duration
+        ? parseInt(metadata.format.duration.toString(), 10)
+        : null; // Default to null if undefined
+      name = name || metadata.common.title || 'Unnamed Track'; // Default name if not provided
     } catch (error) {
       console.error('Error extracting metadata:', error);
-      // Fallback to provided duration if metadata extraction fails
-      durationInSeconds = parseInt(trackMetadata.duration, 10) || null;
+      durationInSeconds = trackMetadata.duration
+        ? parseInt(trackMetadata.duration, 10)
+        : null; // Default to null if undefined
     }
 
-    // Ensure albumId is a number.
-    let validAlbumId = null;
-    if (trackMetadata.albumId) {
-      const parsedAlbumId = parseInt(trackMetadata.albumId, 10);
-      if (!isNaN(parsedAlbumId)) {
-        const album = await this.prisma.album.findUnique({
-          where: { id: parsedAlbumId },
-        });
-        if (album) {
-          validAlbumId = parsedAlbumId;
-        }
-      }
-    }
+    const validAlbumId = trackMetadata.albumId
+      ? parseInt(trackMetadata.albumId, 10)
+      : null; // Default to null if undefined
 
     const trackData = {
-      title: title,
-      duration: durationInSeconds,
+      name: name,
+      duration: durationInSeconds || 0, // Default to 0 if null
       albumId: validAlbumId,
-      filePath: filePath,
+      filePath: filePath || '', // Default to an empty string if filePath is undefined
+      // ... other fields as needed
     };
 
     try {
@@ -122,23 +139,21 @@ export class TrackService {
 
   async updateTrack(id: string, updateTrackDto: UpdateTrackDto) {
     try {
-      const updateData = {
-        title: updateTrackDto.title,
-        // other fields like filePath, etc. if needed
-        artist: updateTrackDto.artistId
-          ? { connect: { id: Number(updateTrackDto.artistId) } }
-          : undefined,
-        album: updateTrackDto.albumId
-          ? { connect: { id: Number(updateTrackDto.albumId) } }
-          : undefined,
+      const updateData: Prisma.TrackUpdateInput = {
+        name: updateTrackDto.name,
+        // Dynamically include fields only if they are provided
+        ...(updateTrackDto.artistId && {
+          artist: { connect: { id: Number(updateTrackDto.artistId) } },
+        }),
+        ...(updateTrackDto.albumId && {
+          album: { connect: { id: Number(updateTrackDto.albumId) } },
+        }),
       };
 
-      const updatedTrack = await this.prisma.track.update({
+      return await this.prisma.track.update({
         where: { id: Number(id) },
         data: updateData,
       });
-
-      return updatedTrack;
     } catch (error) {
       console.error('Error updating track:', error);
       throw new HttpException(

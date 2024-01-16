@@ -75,6 +75,9 @@ export class TrackController {
     @Param('id') id: string,
     @Body() updateTrackDto: UpdateTrackDto,
   ) {
-    return this.trackService.updateTrack(id, updateTrackDto);
+    console.log(`Received update for track ${id}:`, updateTrackDto);
+    {
+      return this.trackService.updateTrack(id, updateTrackDto);
+    }
   }
 }
