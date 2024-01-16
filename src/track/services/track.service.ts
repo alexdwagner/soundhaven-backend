@@ -128,13 +128,43 @@ export class TrackService {
   }
 
   async deleteTrack(id: string) {
-    await this.prisma.track.delete({
-      where: {
-        id: Number(id),
-      },
+    console.log(`Attempting to delete track with ID: ${id}`);
+    const trackIdNumber = Number(id);
+
+    // Check if the track exists
+    const track = await this.prisma.track.findUnique({
+      where: { id: trackIdNumber },
     });
 
-    return { message: 'Track deleted successfully' };
+    if (!track) {
+      console.log(`Track with ID ${id} not found.`);
+      throw new HttpException('Track not found', HttpStatus.NOT_FOUND);
+    }
+
+    // Delete related records in TracksInPlaylist and TracksInGenre
+    await this.prisma.tracksInPlaylist.deleteMany({
+      where: { trackId: trackIdNumber },
+    });
+    await this.prisma.tracksInGenre.deleteMany({
+      where: { trackId: trackIdNumber },
+    });
+
+    try {
+      await this.prisma.track.delete({
+        where: { id: trackIdNumber },
+      });
+      console.log(`Track with ID ${id} deleted successfully.`);
+      return { message: 'Track deleted successfully' };
+    } catch (error) {
+      console.error(
+        `Error occurred while deleting track with ID ${id}:`,
+        error,
+      );
+      throw new HttpException(
+        'Internal server error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   async updateTrack(id: string, updateTrackDto: UpdateTrackDto) {

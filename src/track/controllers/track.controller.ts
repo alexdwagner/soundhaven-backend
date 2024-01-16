@@ -67,6 +67,7 @@ export class TrackController {
 
   @Delete(':id')
   async deleteTrack(@Param('id') id: string) {
+    console.log("Deleting track with ID:", id);
     return this.trackService.deleteTrack(id);
   }
 
