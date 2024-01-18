@@ -1,5 +1,3 @@
-// src/auth/auth.service.ts
-
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -22,41 +20,45 @@ export class AuthService {
     const user = await this.userService.findUserByEmail(email);
     if (user && (await bcrypt.compare(pass, user.password))) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...result } = user;
-      return result;
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword; // Return the user object without the password field
     }
     return null;
   }
 
-  async login(user: any) {
+  async login(user: Omit<User, 'password'>) {
     const payload = { email: user.email, sub: user.id };
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.jwtService.sign(payload, {
+        secret: process.env.ACCESS_TOKEN_SECRET, // For access token
+        expiresIn: '15m', // Shorter expiration for access tokens
+      }),
       refresh_token: this.jwtService.sign(payload, {
-        expiresIn: '7d', // Set longer expiration for refresh token
+        secret: process.env.REFRESH_TOKEN_SECRET, // For refresh token
+        expiresIn: '7d', // Longer expiration for refresh tokens
       }),
     };
   }
 
-  async generateAccessToken(user: any) {
+  async generateAccessToken(user: User) {
     const payload = { email: user.email, sub: user.id };
-    return this.jwtService.sign(payload);
+    return this.jwtService.sign(payload, {
+      secret: process.env.ACCESS_TOKEN_SECRET, // Use ACCESS_TOKEN_SECRET here
+    });
   }
 
-  async generateRefreshToken(user: any) {
-    const refreshToken = this.jwtService.sign(
-      {},
-      {
-        secret: 'refresh-secret', // Use a different secret or load from .env
-        expiresIn: '7d',
-      },
-    );
+  async generateRefreshToken(user: User) {
+    const payload = { userId: user.id };
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: process.env.REFRESH_TOKEN_SECRET, // Explicitly use REFRESH_TOKEN_SECRET
+      expiresIn: '7d',
+    });
 
     await this.prisma.refreshToken.create({
       data: {
         token: refreshToken,
         userId: user.id,
-        expiresIn: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        expiresIn: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
       },
     });
 
@@ -64,7 +66,6 @@ export class AuthService {
   }
 
   async refreshAccessToken(refreshToken: string) {
-    // Validate the refresh token
     const storedToken = await this.prisma.refreshToken.findUnique({
       where: { token: refreshToken },
     });
@@ -73,7 +74,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token.');
     }
 
-    // Generate new access token
     const user = await this.prisma.user.findUnique({
       where: { id: storedToken.userId },
     });
@@ -84,7 +84,12 @@ export class AuthService {
       );
     }
 
-    return this.jwtService.sign({ email: user.email, sub: user.id });
+    return this.jwtService.sign(
+      { email: user.email, sub: user.id },
+      {
+        secret: process.env.ACCESS_TOKEN_SECRET, // Use ACCESS_TOKEN_SECRET here
+      },
+    );
   }
 
   async revokeRefreshToken(token: string) {

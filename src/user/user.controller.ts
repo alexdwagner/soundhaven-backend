@@ -7,6 +7,8 @@ import {
   Param,
   UseGuards,
   Req,
+  Delete,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UserService } from './user.service';
@@ -21,7 +23,18 @@ export class UserController {
 
   @Post()
   async createUser(@Body() createUserDto: CreateUserDto) {
-    return this.userService.createUser(createUserDto);
+    console.log('Received registration request for:', createUserDto.email);
+
+    try {
+      const newUser = await this.userService.createUser(createUserDto);
+      console.log('Created new user:', newUser.email);
+      return newUser;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw new BadRequestException('User already exists with this email');
+      }
+      throw error;
+    }
   }
 
   @Patch(':id')
@@ -46,5 +59,11 @@ export class UserController {
       throw new UnauthorizedException('User not authenticated');
     }
     return this.userService.getUserById(user.id); // Use 'id' instead of 'userId'
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id')
+  async deleteUser(@Param('id') id: string) {
+    return this.userService.deleteUser(id);
   }
 }

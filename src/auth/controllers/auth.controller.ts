@@ -13,10 +13,9 @@ export class AuthController {
 
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
-    const user = await this.userService.createUser(createUserDto);
-    // Optionally, you can generate a token for the user right after registration
-    const access_token = await this.authService.generateAccessToken(user);
-    return { user, access_token };
+    const newUser = await this.userService.createUser(createUserDto);
+    const accessToken = await this.authService.generateAccessToken(newUser);
+    return { user: newUser, accessToken };
   }
 
   @Post('login')
