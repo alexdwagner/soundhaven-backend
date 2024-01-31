@@ -1,14 +1,25 @@
-import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Headers,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 import { UserService } from 'src/user/user.service';
+import { JwtService } from '@nestjs/jwt';
 import { CreateUserDto } from '../../user/dto/create-user.dto';
 import { LoginDto } from '../dto/login.dto';
+import { TokenDto } from '../dto/token.dto';
+import { ApiBody, ApiTags, ApiOperation } from '@nestjs/swagger';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
     private userService: UserService,
+    private jwtService: JwtService,
   ) {}
 
   @Post('register')
@@ -20,6 +31,10 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() loginDto: LoginDto) {
+    console.log('Received Login DTO:', loginDto);
+    console.log('Type of email:', typeof loginDto.email);
+    console.log('Type of password:', typeof loginDto.password);
+
     const user = await this.authService.validateUser(
       loginDto.email,
       loginDto.password,
@@ -27,13 +42,23 @@ export class AuthController {
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
-
-    return this.authService.login(user);
+    const response = await this.authService.login(user);
+    console.log('Sending login response:', response); // Log the final response
+    return response;
   }
 
   @Post('logout')
-  async logout(@Body() body: { refreshToken: string }) {
-    await this.authService.revokeRefreshToken(body.refreshToken);
+  async logout(@Headers('authorization') authHeader: string) {
+    const token = authHeader?.split(' ')[1]; // Extract the token
+
+    // Log to confirm token extraction
+    console.log(`Extracted token for logout: ${token}`);
+
+    if (!token) {
+      throw new BadRequestException('No token provided for logout.');
+    }
+
+    await this.authService.revokeRefreshToken(token);
     return { message: 'Logged out successfully.' };
   }
 
@@ -45,4 +70,43 @@ export class AuthController {
       ),
     };
   }
-}
+
+  @Post('validateToken')
+  @ApiOperation({ summary: 'Validate JWT token' })
+  @ApiBody({ description: 'Token to validate', type: TokenDto })
+  async validateToken(@Body() body: any) {
+    console.log(body);
+    const token = body.token;
+    try {
+      console.log(`Received token for validation: ${token}`);
+  
+      // Decode and verify the token
+      const decoded = this.jwtService.verify(token);
+      console.log(`Decoded token:`, decoded);
+  
+      // Use 'sub' as the userId
+      const userId = decoded.sub;
+      if (!userId) {
+        console.error('Token does not contain userId');
+        throw new UnauthorizedException('Invalid token');
+      }
+  
+      // Find the user by their ID
+      console.log(`Looking up user with ID: ${userId}`);
+      const user = await this.userService.findUserById(userId);
+      if (!user) {
+        console.log(`No user found with ID: ${userId}`);
+        throw new UnauthorizedException('Invalid token');
+      }
+  
+      console.log(`Found user:`, user);
+  
+      // Exclude password and other sensitive fields from the response
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
+    } catch (error) {
+      console.error(`Error validating token: ${error.message}`);
+      throw new UnauthorizedException('Invalid token');
+    }
+  }
+}  

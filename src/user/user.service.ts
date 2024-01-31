@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -20,6 +21,10 @@ export class UserService {
       where: { email: createUserDto.email },
     });
 
+    if (!createUserDto.name) {
+      throw new BadRequestException('Name is required');
+    }
+
     if (existingUser) {
       throw new BadRequestException('Email already in use');
     }
@@ -28,8 +33,9 @@ export class UserService {
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
     const newUser = await this.prisma.user.create({
       data: {
-        ...createUserDto,
+        email: createUserDto.email,
         password: hashedPassword,
+        name: createUserDto.name,
       },
     });
     console.log('User created with ID:', newUser.id);
@@ -48,12 +54,24 @@ export class UserService {
   }
 
   async findUserByEmail(email: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { email },
-    });
+    // Validate that email is a string
+    if (typeof email !== 'string') {
+      console.error(
+        `Invalid email type received in findUserByEmail: ${typeof email}`,
+      );
+      throw new BadRequestException('Invalid email provided');
+    }
+
+    console.log(`Finding user by email: ${email}`);
+    try {
+      return await this.prisma.user.findUnique({ where: { email } });
+    } catch (error) {
+      console.error(`Error finding user by email: ${email}`, error);
+      throw new InternalServerErrorException('Error fetching user data');
+    }
   }
 
-  async getUserById(id: string): Promise<User> {
+  async findUserById(id: string): Promise<User> {
     const numericId = parseInt(id, 10); // Convert id to number
     if (isNaN(numericId)) {
       throw new BadRequestException('Invalid user ID');

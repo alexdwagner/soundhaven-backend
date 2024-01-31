@@ -14,7 +14,7 @@ model User {
   id              Int            @id @default(autoincrement())
   email           String         @unique
   password        String
-  name            String?
+  name            String
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   playlists       Playlist[]
@@ -71,6 +71,7 @@ model Track {
   TracksInGenre    TracksInGenre[]
   filePath String?
   comments Comment[]
+  markers Marker[]
 }
 
 // Playlist model
@@ -122,5 +123,19 @@ model Comment {
   track     Track    @relation(fields: [trackId], references: [id])
   userId    Int?
   user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  marker    Marker?  // Optional one-to-one relation to Marker
+  replies    Comment[] @relation("CommentReplies")
+  replyToId  Int?      @unique
+  replyTo    Comment?  @relation("CommentReplies", fields: [replyToId], references: [id])
+}
+
+model Marker {
+  id        Int      @id @default(autoincrement())
+  time      Float    // Time in the track (e.g., in seconds)
+  commentId Int?     @unique // Ensure uniqueness to maintain one-to-one relationship
+  comment   Comment? @relation(fields: [commentId], references: [id])
+  trackId   Int
+  track     Track    @relation(fields: [trackId], references: [id])
   createdAt DateTime @default(now())
 }

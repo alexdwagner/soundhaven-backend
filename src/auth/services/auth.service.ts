@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  NotFoundException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UserService } from 'src/user/user.service';
@@ -12,45 +16,78 @@ export class AuthService {
     private userService: UserService,
     private jwtService: JwtService,
   ) {}
+  async validateToken(token: string) {
+    try {
+      const decoded = this.jwtService.verify(token);
+
+      if (!decoded.userId) {
+        throw new UnauthorizedException('Invalid token - no user ID');
+      }
+
+      const user = await this.userService.findUserById(decoded.userId);
+
+      if (!user) {
+        throw new NotFoundException('No user found');
+      }
+
+      return this.sanitizeUser(user);
+    } catch (error) {
+      throw new UnauthorizedException('Token validation failed');
+    }
+  }
+
+  private sanitizeUser(user: User) {
+    // Omit sensitive fields like password
+    const { password, ...sanitized } = user;
+
+    return sanitized;
+  }
 
   async validateUser(
     email: string,
     pass: string,
   ): Promise<Omit<User, 'password'> | null> {
     const user = await this.userService.findUserByEmail(email);
-    if (user && (await bcrypt.compare(pass, user.password))) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword; // Return the user object without the password field
+    if (!user) {
+      throw new NotFoundException(`User not found`);
     }
-    return null;
+
+    const passwordIsValid = await bcrypt.compare(pass, user.password);
+    if (!passwordIsValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 
   async login(user: Omit<User, 'password'>) {
-    const payload = { email: user.email, sub: user.id };
+    if (!user) {
+      throw new Error('User object is required for login');
+    }
+    console.log(`Generating access token for user: ${user.email}`);
+    const accessToken = await this.generateAccessToken(user);
+    const refreshToken = await this.generateRefreshToken(user);
+    console.log(`Access and refresh tokens generated for user: ${user.email}`);
     return {
-      access_token: this.jwtService.sign(payload, {
-        secret: process.env.ACCESS_TOKEN_SECRET, // For access token
-        expiresIn: '15m', // Shorter expiration for access tokens
-      }),
-      refresh_token: this.jwtService.sign(payload, {
-        secret: process.env.REFRESH_TOKEN_SECRET, // For refresh token
-        expiresIn: '7d', // Longer expiration for refresh tokens
-      }),
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      user,
     };
   }
 
-  async generateAccessToken(user: User) {
+  async generateAccessToken(user: Omit<User, 'password'>) {
     const payload = { email: user.email, sub: user.id };
     return this.jwtService.sign(payload, {
-      secret: process.env.ACCESS_TOKEN_SECRET, // Use ACCESS_TOKEN_SECRET here
+      secret: process.env.ACCESS_TOKEN_SECRET,
+      expiresIn: '15m',
     });
   }
 
-  async generateRefreshToken(user: User) {
+  async generateRefreshToken(user: Omit<User, 'password'>) {
     const payload = { userId: user.id };
     const refreshToken = this.jwtService.sign(payload, {
-      secret: process.env.REFRESH_TOKEN_SECRET, // Explicitly use REFRESH_TOKEN_SECRET
+      secret: process.env.REFRESH_TOKEN_SECRET,
       expiresIn: '7d',
     });
 
@@ -93,6 +130,33 @@ export class AuthService {
   }
 
   async revokeRefreshToken(token: string) {
-    await this.prisma.refreshToken.delete({ where: { token } });
+    try {
+      // Log to indicate the search for the existing token
+      console.log(`Looking up refresh token: ${token}`);
+
+      const existingToken = await this.prisma.refreshToken.findUnique({
+        where: { token },
+      });
+
+      // Log to warn if token not found and return early
+      if (!existingToken) {
+        console.warn('Refresh token not found for revocation:', token);
+        return;
+      }
+
+      // Log to indicate the deletion of the token
+      console.log(`Deleting refresh token: ${token}`);
+      await this.prisma.refreshToken.delete({
+        where: { token },
+      });
+
+      // Log to confirm successful revocation
+      console.log('Refresh token revoked:', token);
+    } catch (error) {
+      console.error('Error revoking refresh token:', error);
+      throw new Error(
+        `Failed to revoke refresh token. Details: ${error.message}`,
+      );
+    }
   }
 }

@@ -13,8 +13,9 @@ export class PrismaService extends PrismaClient {
   }
 
   // User Model Methods
-  async createUser(data: { email: string; password: string; name?: string }) {
+  async createUser(data: { email: string; password: string; name: string }) {
     const hashedPassword = await hash(data.password, 10); // Hashing password
+
     return this.user.create({
       data: {
         email: data.email,

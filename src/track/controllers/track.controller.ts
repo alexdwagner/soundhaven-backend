@@ -62,12 +62,18 @@ export class TrackController {
       file,
       trackMetadata,
     );
+
+    console.log('Response from saveUploadedTrack:', {
+      message: 'File uploaded successfully',
+      filePath,
+    }); // Log the response
+
     return { message: 'File uploaded successfully', filePath };
   }
 
   @Delete(':id')
   async deleteTrack(@Param('id') id: string) {
-    console.log("Deleting track with ID:", id);
+    console.log('Deleting track with ID:', id);
     return this.trackService.deleteTrack(id);
   }
 

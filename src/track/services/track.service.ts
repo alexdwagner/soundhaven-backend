@@ -82,7 +82,9 @@ export class TrackService {
 
     const filename = `${Date.now()}-${file.originalname}`;
     const filePath = path.join(uploadPath, filename);
-    fs.writeFileSync(filePath, file.buffer);
+
+    // Log after filePath is defined
+    console.log('Saving uploaded file at path:', filePath);
 
     let durationInSeconds: number | null = null;
     let name = trackMetadata.name || 'Unnamed Track'; // Default name if not provided
@@ -114,6 +116,8 @@ export class TrackService {
       filePath: filePath || '', // Default to an empty string if filePath is undefined
       // ... other fields as needed
     };
+
+    console.log('Track data being saved:', trackData);
 
     try {
       await this.prisma.track.create({ data: trackData });
