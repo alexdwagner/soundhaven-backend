@@ -15,26 +15,7 @@ export class AuthService {
     private prisma: PrismaService,
     private userService: UserService,
     private jwtService: JwtService,
-  ) {}
-  async validateToken(token: string) {
-    try {
-      const decoded = this.jwtService.verify(token);
-
-      if (!decoded.userId) {
-        throw new UnauthorizedException('Invalid token - no user ID');
-      }
-
-      const user = await this.userService.findUserById(decoded.userId);
-
-      if (!user) {
-        throw new NotFoundException('No user found');
-      }
-
-      return this.sanitizeUser(user);
-    } catch (error) {
-      throw new UnauthorizedException('Token validation failed');
-    }
-  }
+  ) { }
 
   private sanitizeUser(user: User) {
     // Omit sensitive fields like password
@@ -62,17 +43,20 @@ export class AuthService {
   }
 
   async login(user: Omit<User, 'password'>) {
-    if (!user) {
-      throw new Error('User object is required for login');
-    }
-    console.log(`Generating access token for user: ${user.email}`);
+    // Assuming user validation has already occurred to reach this point
     const accessToken = await this.generateAccessToken(user);
     const refreshToken = await this.generateRefreshToken(user);
-    console.log(`Access and refresh tokens generated for user: ${user.email}`);
+    // Directly after login, token validation might not be necessary as mentioned
+    // But if you need to validate for some reason:
+    const validationResponse = await this.validateToken(accessToken);
+    if (!validationResponse.isValid) {
+      throw new UnauthorizedException('Token validation failed post-login');
+    }
+    // Proceed with login response
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
-      user,
+      user: validationResponse.user, // Ensure this is the expected user object structure
     };
   }
 
@@ -157,6 +141,30 @@ export class AuthService {
       throw new Error(
         `Failed to revoke refresh token. Details: ${error.message}`,
       );
+    }
+  }
+
+  // This method should validate the JWT token and return user details if valid
+  async validateToken(token: string): Promise<{ isValid: boolean; user?: any }> {
+    try {
+      const decoded = this.jwtService.verify(token, { secret: process.env.ACCESS_TOKEN_SECRET }); // Ensure you're using the correct secret
+      const userId = decoded.sub;
+
+      if (!userId) {
+        return { isValid: false };
+      }
+
+      const user = await this.userService.findUserById(userId);
+      if (!user) {
+        return { isValid: false };
+      }
+
+      // Exclude password and other sensitive fields
+      const { password, ...userWithoutPassword } = user;
+      return { isValid: true, user: userWithoutPassword };
+    } catch (error) {
+      console.error('Error validating token:', error);
+      return { isValid: false };
     }
   }
 }

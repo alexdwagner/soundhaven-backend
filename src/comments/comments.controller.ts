@@ -38,19 +38,19 @@ export class CommentsController {
   async addComment(
     @Body('trackId') trackId: number,
     @Body('userId') userId: number,
-    @Body('text') text: string,
+    @Body('content') content: string,
   ): Promise<Comment> {
     console.log(
-      `Received request with trackId: ${trackId}, userId: ${userId}, text: ${text}`,
+      `Received request with trackId: ${trackId}, userId: ${userId}, content: ${content}`,
     );
     if (!trackId || trackId <= 0 || !userId || userId <= 0) {
       throw new BadRequestException('Valid Track ID and User ID are required');
     }
-    if (!text || text.trim() === '') {
-      throw new BadRequestException('Comment text cannot be empty');
+    if (!content || content.trim() === '') {
+      throw new BadRequestException('Comment content cannot be empty');
     }
     try {
-      return await this.commentsService.addComment(trackId, userId, text);
+      return await this.commentsService.addComment(trackId, userId, content);
     } catch (error: any) {
       console.error('Failed to add comment:', error);
       throw new HttpException(
@@ -63,9 +63,9 @@ export class CommentsController {
   @Patch(':id')
   async editComment(
     @Param('id', ParseIntPipe) commentId: number,
-    @Body('text') text: string,
+    @Body('content') content: string,
   ) {
-    return this.commentsService.editComment(commentId, text);
+    return this.commentsService.editComment(commentId, content);
   }
 
   @Delete(':id')

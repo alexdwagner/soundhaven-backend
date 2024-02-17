@@ -1,10 +1,13 @@
+import { Request } from 'express'; // Make sure to import Request from express
 import {
   Controller,
+  Req,
   Post,
   Body,
   Headers,
   UnauthorizedException,
   BadRequestException,
+  UseGuards
 } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 import { UserService } from 'src/user/user.service';
@@ -20,7 +23,7 @@ export class AuthController {
     private authService: AuthService,
     private userService: UserService,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
@@ -70,43 +73,4 @@ export class AuthController {
       ),
     };
   }
-
-  @Post('validateToken')
-  @ApiOperation({ summary: 'Validate JWT token' })
-  @ApiBody({ description: 'Token to validate', type: TokenDto })
-  async validateToken(@Body() body: any) {
-    console.log(body);
-    const token = body.token;
-    try {
-      console.log(`Received token for validation: ${token}`);
-  
-      // Decode and verify the token
-      const decoded = this.jwtService.verify(token);
-      console.log(`Decoded token:`, decoded);
-  
-      // Use 'sub' as the userId
-      const userId = decoded.sub;
-      if (!userId) {
-        console.error('Token does not contain userId');
-        throw new UnauthorizedException('Invalid token');
-      }
-  
-      // Find the user by their ID
-      console.log(`Looking up user with ID: ${userId}`);
-      const user = await this.userService.findUserById(userId);
-      if (!user) {
-        console.log(`No user found with ID: ${userId}`);
-        throw new UnauthorizedException('Invalid token');
-      }
-  
-      console.log(`Found user:`, user);
-  
-      // Exclude password and other sensitive fields from the response
-      const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword;
-    } catch (error) {
-      console.error(`Error validating token: ${error.message}`);
-      throw new UnauthorizedException('Invalid token');
-    }
-  }
-}  
+}
