@@ -7,7 +7,7 @@ import {
   Headers,
   UnauthorizedException,
   BadRequestException,
-  UseGuards
+  UseGuards,
 } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 import { UserService } from 'src/user/user.service';
@@ -23,7 +23,7 @@ export class AuthController {
     private authService: AuthService,
     private userService: UserService,
     private jwtService: JwtService,
-  ) { }
+  ) {}
 
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {

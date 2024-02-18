@@ -70,64 +70,51 @@ export class TrackService {
     });
   }
 
-  async saveUploadedTrack(
-    file: Express.Multer.File,
-    trackMetadata: CreateTrackDto,
-  ): Promise<{ filePath: string }> {
+  async saveUploadedTrack(file: Express.Multer.File, trackMetadata: CreateTrackDto): Promise<{ filePath: string }> {
     // Define the upload path
     const uploadPath = process.env.UPLOAD_PATH || 'uploads';
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
-
+  
     const filename = `${Date.now()}-${file.originalname}`;
     const filePath = path.join(uploadPath, filename);
-
-    // Log after filePath is defined
-    console.log('Saving uploaded file at path:', filePath);
-
-    let durationInSeconds: number | null = null;
-    let name = trackMetadata.name || 'Unnamed Track'; // Default name if not provided
-
+  
+    // Attempt to save the file to the filesystem
     try {
-      const metadata = await musicMetadata.parseBuffer(
-        file.buffer,
-        file.mimetype || 'audio/mpeg', // Default mimetype if undefined
-      );
-      durationInSeconds = metadata.format.duration
-        ? parseInt(metadata.format.duration.toString(), 10)
-        : null; // Default to null if undefined
-      name = name || metadata.common.title || 'Unnamed Track'; // Default name if not provided
-    } catch (error) {
-      console.error('Error extracting metadata:', error);
-      durationInSeconds = trackMetadata.duration
-        ? parseInt(trackMetadata.duration, 10)
-        : null; // Default to null if undefined
-    }
-
-    const validAlbumId = trackMetadata.albumId
-      ? parseInt(trackMetadata.albumId, 10)
-      : null; // Default to null if undefined
-
-    const trackData = {
-      name: name,
-      duration: durationInSeconds || 0, // Default to 0 if null
-      albumId: validAlbumId,
-      filePath: filePath || '', // Default to an empty string if filePath is undefined
-      // ... other fields as needed
-    };
-
-    console.log('Track data being saved:', trackData);
-
-    try {
+      // Save the file buffer to the specified path
+      await fs.promises.writeFile(filePath, file.buffer);
+  
+      let durationInSeconds: number | null = null;
+      let name = trackMetadata.name || 'Unnamed Track'; // Default name if not provided
+  
+      // Attempt to extract metadata from the file buffer
+      try {
+        const metadata = await musicMetadata.parseBuffer(file.buffer, file.mimetype || 'audio/mpeg');
+        durationInSeconds = metadata.format.duration ? parseInt(metadata.format.duration.toString(), 10) : null;
+        name = name || metadata.common.title || 'Unnamed Track';
+      } catch (error) {
+        console.error('Error extracting metadata:', error);
+        durationInSeconds = trackMetadata.duration ? parseInt(trackMetadata.duration, 10) : null;
+      }
+  
+      const validAlbumId = trackMetadata.albumId ? parseInt(trackMetadata.albumId, 10) : null;
+  
+      const trackData = {
+        name: name,
+        duration: durationInSeconds || 0,
+        albumId: validAlbumId,
+        filePath: filePath
+      };
+  
+      // Save track data to the database
       await this.prisma.track.create({ data: trackData });
+      console.log('Track data being saved:', trackData);
+  
       return { filePath };
     } catch (error) {
-      console.error('Error in saveUploadedTrack:', error);
-      throw new HttpException(
-        'Failed to upload track',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      console.error('Error saving uploaded track:', error);
+      throw new HttpException('Failed to save uploaded track', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

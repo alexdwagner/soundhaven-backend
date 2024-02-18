@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Comment } from '@prisma/client';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { AddCommentDto } from './dto/add-comment.dto';
+import { AddCommentWithMarkerDto } from './dto/add-comment-with-marker.dto';
 
 @Injectable()
 export class CommentsService {
@@ -25,22 +27,23 @@ export class CommentsService {
         },
       });
 
-      return comments.map(comment => ({
+      return comments.map((comment) => ({
         ...comment,
         userName: comment.user?.name || 'Anonymous',
       }));
-    } catch (error: any) { // Typing error as any for simplicity; consider a more specific type or custom error handling
+    } catch (error: any) {
+      // Typing error as any for simplicity; consider a more specific type or custom error handling
       console.error(`Failed to retrieve comments for track ${trackId}:`, error);
-      throw new HttpException('Failed to retrieve comments', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Failed to retrieve comments',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
-  async addComment(
-    trackId: number,
-    userId: number,
-    content: string,
-    markerTime?: number,
-  ): Promise<Comment> {
+  async addComment(dto: AddCommentDto): Promise<Comment> {
+    const { trackId, userId, content, start, end } = dto; // Destructure 'start' and 'end' from the DTO
+
     if (!userId) {
       throw new Error('User ID is required to add a comment.');
     }
@@ -54,21 +57,25 @@ export class CommentsService {
     }
 
     try {
+      const commentData: any = {
+        trackId,
+        userId,
+        content,
+      };
+
+      // Conditionally add marker data if 'start' is provided
+      if (typeof start !== 'undefined') {
+        commentData.marker = {
+          create: {
+            start,
+            ...(typeof end !== 'undefined' && { end }), // Include 'end' only if it's provided
+            trackId,
+          },
+        };
+      }
+
       const comment = await this.prisma.comment.create({
-        data: {
-          trackId,
-          userId,
-          content,
-          // Conditionally create a marker if markerTime is provided
-          ...(markerTime !== undefined && {
-            marker: {
-              create: {
-                time: markerTime,
-                trackId, // Assuming the marker needs a reference to the track
-              },
-            },
-          }),
-        },
+        data: commentData,
         include: {
           marker: true, // Include the marker data in the response
         },
@@ -81,6 +88,30 @@ export class CommentsService {
     }
   }
 
+  async addCommentWithMarker(dto: AddCommentWithMarkerDto): Promise<Comment> {
+    const { trackId, userId, content, start, end } = dto;
+
+    return await this.prisma.$transaction(async (prisma) => {
+      const comment = await prisma.comment.create({
+        data: {
+          trackId,
+          userId,
+          content,
+        },
+      });
+  
+      await prisma.marker.create({
+        data: {
+          start,
+          end, // end is optional; it will be included if provided
+          trackId,
+          commentId: comment.id,
+        },
+      });
+  
+      return comment;
+    });
+  }
 
   async editComment(commentId: number, content: string): Promise<Comment> {
     return this.prisma.comment.update({
@@ -89,13 +120,21 @@ export class CommentsService {
     });
   }
 
-// Ensure deleteComment also deletes any associated marker
+  // Ensure deleteComment also deletes any associated marker
   async deleteComment(commentId: number): Promise<void> {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+      include: { marker: true },
+    });
+
+    if (comment && comment.marker) {
+      await this.prisma.marker.delete({
+        where: { id: comment.marker.id },
+      });
+    }
+
     await this.prisma.comment.delete({
       where: { id: commentId },
-      include: {
-        marker: true,
-      },
     });
   }
 
