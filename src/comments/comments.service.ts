@@ -1,11 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, forwardRef } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Comment } from '@prisma/client';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { MarkersService } from 'src/markers/markers.service';
 
 @Injectable()
 export class CommentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private markersService: MarkersService,
+  ) { }
 
   async getTrackComments(
     trackId: number,
@@ -27,10 +31,9 @@ export class CommentsService {
 
       return comments.map(comment => ({
         ...comment,
-        userName: comment.user?.name || 'Anonymous',
+        userName: comment.user?.name,
       }));
-    } catch (error: any) { // Typing error as any for simplicity; consider a more specific type or custom error handling
-      console.error(`Failed to retrieve comments for track ${trackId}:`, error);
+    } catch (error) {
       throw new HttpException('Failed to retrieve comments', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -63,7 +66,7 @@ export class CommentsService {
           ...(markerTime !== undefined && {
             marker: {
               create: {
-                time: markerTime,
+                start: markerTime,
                 trackId, // Assuming the marker needs a reference to the track
               },
             },
@@ -77,8 +80,42 @@ export class CommentsService {
       return comment;
     } catch (error) {
       console.error('Error adding comment with marker:', error);
-      throw error; // Ensure to handle or rethrow the error appropriately
+      throw new HttpException('Error adding comment', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  async addCommentWithMarker(
+    trackId: number,
+    userId: number,
+    content: string,
+    start: number,
+  ): Promise<Comment> {
+    if (!userId || !trackId || !content.trim()) {
+      throw new HttpException('Missing required fields', HttpStatus.BAD_REQUEST);
+    }
+
+    return await this.prisma.$transaction(async (prisma) => {
+      const comment = await prisma.comment.create({
+        data: {
+          trackId,
+          userId,
+          content,
+        },
+      });
+
+      await this.markersService.createMarker({
+        start,
+        trackId,
+        commentId: comment.id, // Assuming the marker needs a reference to the comment
+      });
+
+      // Optionally refetch the comment to include the marker in the response
+      // if needed or simply return the created comment as is.
+      return comment;
+    }).catch(error => {
+      console.error('Error adding comment with marker:', error);
+      throw new HttpException('Error adding comment with marker', HttpStatus.INTERNAL_SERVER_ERROR);
+    });
   }
 
 
@@ -89,7 +126,7 @@ export class CommentsService {
     });
   }
 
-// Ensure deleteComment also deletes any associated marker
+  // Ensure deleteComment also deletes any associated marker
   async deleteComment(commentId: number): Promise<void> {
     await this.prisma.comment.delete({
       where: { id: commentId },

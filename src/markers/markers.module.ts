@@ -6,5 +6,6 @@ import { PrismaService } from 'src/prisma/prisma.service';
 @Module({
   controllers: [MarkersController],
   providers: [MarkersService, PrismaService],
+  exports: [MarkersService],
 })
 export class MarkersModule {}
