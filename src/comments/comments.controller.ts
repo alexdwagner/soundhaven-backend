@@ -17,7 +17,7 @@ import { CommentsService } from './comments.service';
 
 @Controller('comments')
 export class CommentsController {
-  constructor(private commentsService: CommentsService) { }
+  constructor(private commentsService: CommentsService) {}
 
   @Get()
   async getTrackComments(@Query('trackId') trackId: number) {
@@ -67,7 +67,12 @@ export class CommentsController {
     @Body('content') content: string,
     @Body('start') start: number, // Assuming the start time for the marker is passed in the request body
   ): Promise<Comment> {
-    return this.commentsService.addCommentWithMarker(trackId, userId, content, start);
+    return this.commentsService.addCommentWithMarker(
+      trackId,
+      userId,
+      content,
+      start,
+    );
   }
 
   @Patch(':id')

@@ -51,24 +51,22 @@ export class TrackController {
   }
 
   @Post('upload')
-  // @UseGuards(AuthGuard('jwt'))
+  // @UseGuards(AuthGuard('jwt')) // Uncomment as necessary
   @UseInterceptors(FileInterceptor('file'))
   async uploadTrack(
     @UploadedFile() file: Express.Multer.File,
     @Body() trackMetadata: CreateTrackDto,
-  ) {
-    console.log('Upload request received with file:', file?.originalname);
-    const { filePath } = await this.trackService.saveUploadedTrack(
-      file,
-      trackMetadata,
-    );
+  ): Promise<{ message: string; filePath?: string }> {
+    try {
+      console.log(`Upload request received with file: ${file?.originalname}`);
+      const { filePath } = await this.trackService.saveUploadedTrack(file, trackMetadata);
 
-    console.log('Response from saveUploadedTrack:', {
-      message: 'File uploaded successfully',
-      filePath,
-    }); // Log the response
-
-    return { message: 'File uploaded successfully', filePath };
+      console.log(`File uploaded successfully: ${filePath}`);
+      return { message: 'File uploaded successfully', filePath };
+    } catch (error) {
+      console.error(`Failed to upload file: ${error.message}`);
+      throw new HttpException('Failed to upload track', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Delete(':id')

@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTrackDto } from './../dto/create-track.dto';
 import { UpdateTrackDto } from '../dto/update-track.dto';
-import * as fs from 'fs';
+import * as fs from 'fs/promises'; // Directly import fs/promises
 import * as path from 'path';
 import { Express } from 'express';
 import * as musicMetadata from 'music-metadata';
@@ -19,6 +19,12 @@ export class TrackService {
   async getAllTracks() {
     console.log('Service: Fetching all tracks');
     return this.prisma.track.findMany();
+  }
+
+  async getTrackById(id: string) {
+    return this.prisma.track.findUnique({
+      where: { id: Number(id) },
+    });
   }
 
   async createTrack(createTrackDto: CreateTrackDto) {
@@ -64,70 +70,54 @@ export class TrackService {
     return this.prisma.track.create({ data: trackData });
   }
 
-  async getTrackById(id: string) {
-    return this.prisma.track.findUnique({
-      where: { id: Number(id) },
-    });
-  }
-
   async saveUploadedTrack(
     file: Express.Multer.File,
     trackMetadata: CreateTrackDto,
   ): Promise<{ filePath: string }> {
-    // Define the upload path
     const uploadPath = process.env.UPLOAD_PATH || 'uploads';
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
+    // Ensure the directory exists
+    try {
+      await fs.mkdir(uploadPath, { recursive: true });
+    } catch (error) {
+      console.error('Could not create upload directory:', error);
     }
 
     const filename = `${Date.now()}-${file.originalname}`;
     const filePath = path.join(uploadPath, filename);
 
-    // Log after filePath is defined
-    console.log('Saving uploaded file at path:', filePath);
-
-    let durationInSeconds: number | null = null;
-    let name = trackMetadata.name || 'Unnamed Track'; // Default name if not provided
-
+    // Save the file
     try {
-      const metadata = await musicMetadata.parseBuffer(
-        file.buffer,
-        file.mimetype || 'audio/mpeg', // Default mimetype if undefined
-      );
-      durationInSeconds = metadata.format.duration
-        ? parseInt(metadata.format.duration.toString(), 10)
-        : null; // Default to null if undefined
-      name = name || metadata.common.title || 'Unnamed Track'; // Default name if not provided
-    } catch (error) {
-      console.error('Error extracting metadata:', error);
-      durationInSeconds = trackMetadata.duration
-        ? parseInt(trackMetadata.duration, 10)
-        : null; // Default to null if undefined
-    }
+      await fs.writeFile(filePath, file.buffer);
+      console.log('File saved to:', filePath);
 
-    const validAlbumId = trackMetadata.albumId
-      ? parseInt(trackMetadata.albumId, 10)
-      : null; // Default to null if undefined
+      // Additional code to handle file metadata and save track info to DB...
+      let durationInSeconds: number | null = null;
+      let name = trackMetadata.name || 'Unnamed Track';
 
-    const trackData = {
-      name: name,
-      duration: durationInSeconds || 0, // Default to 0 if null
-      albumId: validAlbumId,
-      filePath: filePath || '', // Default to an empty string if filePath is undefined
-      // ... other fields as needed
-    };
+      // Try to extract duration from metadata
+      try {
+        const metadata = await musicMetadata.parseBuffer(file.buffer, file.mimetype || 'audio/mpeg');
+        durationInSeconds = metadata.format.duration ? parseInt(metadata.format.duration.toString(), 10) : null;
+        name = name || metadata.common.title || 'Unnamed Track';
+      } catch (error) {
+        console.error('Error extracting metadata:', error);
+      }
 
-    console.log('Track data being saved:', trackData);
+      const trackData = {
+        name,
+        duration: durationInSeconds || 0,
+        filePath,
+        // other properties
+      };
 
-    try {
-      await this.prisma.track.create({ data: trackData });
+      // Save track data to DB
+      const savedTrack = await this.prisma.track.create({ data: trackData });
+      console.log('Track saved:', savedTrack);
+
       return { filePath };
     } catch (error) {
-      console.error('Error in saveUploadedTrack:', error);
-      throw new HttpException(
-        'Failed to upload track',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      console.error('Error saving file:', error);
+      throw new HttpException('Failed to save file', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

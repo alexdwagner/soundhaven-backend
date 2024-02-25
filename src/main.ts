@@ -32,8 +32,9 @@ async function bootstrap() {
     }),
   );
 
-  // Serve static files from the 'uploads' directory
-  app.use('/uploads', express.static(join(__dirname, '..', 'uploads')));
+  const uploadsPath = join(__dirname, '..', 'uploads');
+  console.log(`Serving static files from: ${uploadsPath}`);
+  app.use('/uploads', express.static(uploadsPath));
 
   const port = process.env.PORT || 3122;
   await app.listen(port);

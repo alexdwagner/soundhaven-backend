@@ -17,9 +17,9 @@ export class MarkersService {
   async createMarker(createMarkerDto: CreateMarkerDto): Promise<Marker> {
     return this.prisma.marker.create({
       data: {
-        start: createMarkerDto.start,
+        time: createMarkerDto.time,
         trackId: createMarkerDto.trackId,
-        commentId: createMarkerDto.commentId || null,
+        commentId: createMarkerDto.commentId,
       },
     });
   }
@@ -37,7 +37,7 @@ export class MarkersService {
     return this.prisma.marker.update({
       where: { id: Number(id) },
       data: {
-        start: updateMarkerDto.start,
+        time: updateMarkerDto.start,
         trackId: updateMarkerDto.trackId,
         commentId: updateMarkerDto.commentId,
       },

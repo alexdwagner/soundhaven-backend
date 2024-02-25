@@ -3,7 +3,7 @@ import { IsNotEmpty, IsNumber } from 'class-validator';
 export class CreateMarkerDto {
   @IsNumber()
   @IsNotEmpty()
-  start: number;
+  time: number;
 
   @IsNumber()
   @IsNotEmpty()
