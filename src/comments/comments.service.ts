@@ -33,12 +33,14 @@ export class CommentsService {
       // Transform comments to include userName and handle marker data
       const transformedComments = comments.map((comment) => ({
         ...comment,
-        userName: comment.user.name, // Assuming user is always present based on your model
-        // Map marker to include only relevant data or null if no marker
+        userName: comment.user!.name, // Asserting user is non-null
         marker: comment.marker
           ? {
-              time: comment.marker.time, // Include other marker properties as needed
-              // Add other relevant marker fields here
+              id: comment.marker.id,
+              time: comment.marker.time,
+              commentId: comment.marker.commentId,
+              trackId: comment.marker.trackId,
+              createdAt: comment.marker.createdAt,
             }
           : null,
       }));
@@ -108,40 +110,55 @@ export class CommentsService {
     content: string,
     time: number,
   ): Promise<Comment> {
-    if (!userId || !trackId || !content.trim()) {
+    // Construct an array to hold missing field names
+    const missingFields = [];
+    if (!userId) missingFields.push('userId');
+    if (!trackId) missingFields.push('trackId');
+    if (!content.trim()) missingFields.push('content');
+  
+    // Check if there are any missing fields
+    if (missingFields.length > 0) {
+      const missingFieldsMessage = `Missing required fields: ${missingFields.join(', ')}`;
+      console.error(missingFieldsMessage);
+      throw new HttpException(missingFieldsMessage, HttpStatus.BAD_REQUEST);
+    }
+  
+    // Verify the existence of related records
+    const trackExists = await this.prisma.track.findUnique({ where: { id: trackId } });
+    if (!trackExists) {
+      throw new HttpException('Track does not exist', HttpStatus.BAD_REQUEST);
+    }
+  
+    const userExists = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!userExists) {
+      throw new HttpException('User does not exist', HttpStatus.BAD_REQUEST);
+    }
+  
+    // Proceed with creating the comment and marker
+    try {
+      const comment = await this.prisma.comment.create({
+        data: {
+          trackId,
+          userId,
+          content,
+        },
+      });
+  
+      // Use the `createMarker` method from your markers service
+      await this.markersService.createMarker({
+        time,
+        trackId,
+        commentId: comment.id,
+      });
+  
+      return comment; // Return the created comment
+    } catch (error) {
+      console.error('Error adding comment with marker:', error);
       throw new HttpException(
-        'Missing required fields',
-        HttpStatus.BAD_REQUEST,
+        'Error adding comment with marker',
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    return await this.prisma
-      .$transaction(async (prisma) => {
-        const comment = await prisma.comment.create({
-          data: {
-            trackId,
-            userId,
-            content,
-          },
-        });
-
-        await this.markersService.createMarker({
-          time,
-          trackId,
-          commentId: comment.id, // Assuming the marker needs a reference to the comment
-        });
-
-        // Optionally refetch the comment to include the marker in the response
-        // if needed or simply return the created comment as is.
-        return comment;
-      })
-      .catch((error) => {
-        console.error('Error adding comment with marker:', error);
-        throw new HttpException(
-          'Error adding comment with marker',
-          HttpStatus.INTERNAL_SERVER_ERROR,
-        );
-      });
   }
 
   async editComment(commentId: number, content: string): Promise<Comment> {
