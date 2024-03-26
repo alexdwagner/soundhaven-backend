@@ -15,7 +15,7 @@ export class AuthService {
     private prisma: PrismaService,
     private userService: UserService,
     private jwtService: JwtService,
-  ) { }
+  ) {}
 
   private sanitizeUser(user: User) {
     // Omit sensitive fields like password
@@ -56,16 +56,61 @@ export class AuthService {
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
-      user: validationResponse.user, // Ensure this is the expected user object structure
+      user, // Ensure this is the expected user object structure
     };
   }
 
   async generateAccessToken(user: Omit<User, 'password'>) {
     const payload = { email: user.email, sub: user.id };
+
+    console.log(
+      'ACCESS_TOKEN_SECRET (generation):',
+      process.env.ACCESS_TOKEN_SECRET,
+    ); // Add this logging
+
     return this.jwtService.sign(payload, {
       secret: process.env.ACCESS_TOKEN_SECRET,
-      expiresIn: '15m',
+      expiresIn: '60m',
     });
+  }
+
+  // This method should validate the JWT token and return user details if valid
+  async validateToken(
+    token: string,
+  ): Promise<{ isValid: boolean; user?: any }> {
+    console.log('AuthService.validateToken - Entered');
+    try {
+      console.log('Decoding token:', token);
+      const decoded = this.jwtService.verify(token, {
+        secret: process.env.ACCESS_TOKEN_SECRET,
+      }); // Ensure you're using the correct secret
+
+      console.log(
+        'ACCESS_TOKEN_SECRET (validation):',
+        process.env.ACCESS_TOKEN_SECRET,
+      ); // Add this logging
+
+      // console.log('Decoded token:', decoded);
+
+      const userId = decoded.sub;
+      if (!userId) {
+        return { isValid: false };
+      }
+
+      const user = await this.userService.getUserIdFromTokenSub(userId);
+      // console.log('User fetched from token sub:', user); // Log the fetched user
+
+      if (!user) {
+        return { isValid: false };
+      }
+
+      // Exclude password and other sensitive fields
+      const { password, ...userWithoutPassword } = user;
+      return { isValid: true, user: userWithoutPassword };
+    } catch (error) {
+      console.error('Error validating token:', error);
+      return { isValid: false };
+    }
   }
 
   async generateRefreshToken(user: Omit<User, 'password'>) {
@@ -141,30 +186,6 @@ export class AuthService {
       throw new Error(
         `Failed to revoke refresh token. Details: ${error.message}`,
       );
-    }
-  }
-
-  // This method should validate the JWT token and return user details if valid
-  async validateToken(token: string): Promise<{ isValid: boolean; user?: any }> {
-    try {
-      const decoded = this.jwtService.verify(token, { secret: process.env.ACCESS_TOKEN_SECRET }); // Ensure you're using the correct secret
-      const userId = decoded.sub;
-
-      if (!userId) {
-        return { isValid: false };
-      }
-
-      const user = await this.userService.findUserById(userId);
-      if (!user) {
-        return { isValid: false };
-      }
-
-      // Exclude password and other sensitive fields
-      const { password, ...userWithoutPassword } = user;
-      return { isValid: true, user: userWithoutPassword };
-    } catch (error) {
-      console.error('Error validating token:', error);
-      return { isValid: false };
     }
   }
 }

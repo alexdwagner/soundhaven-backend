@@ -20,6 +20,7 @@ export class MarkersService {
         time: createMarkerDto.time,
         trackId: createMarkerDto.trackId,
         commentId: createMarkerDto.commentId,
+        waveSurferRegionID: createMarkerDto.waveSurferRegionID,
       },
     });
   }

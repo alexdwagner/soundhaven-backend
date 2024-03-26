@@ -96,8 +96,13 @@ export class TrackService {
 
       // Try to extract duration from metadata
       try {
-        const metadata = await musicMetadata.parseBuffer(file.buffer, file.mimetype || 'audio/mpeg');
-        durationInSeconds = metadata.format.duration ? parseInt(metadata.format.duration.toString(), 10) : null;
+        const metadata = await musicMetadata.parseBuffer(
+          file.buffer,
+          file.mimetype || 'audio/mpeg',
+        );
+        durationInSeconds = metadata.format.duration
+          ? parseInt(metadata.format.duration.toString(), 10)
+          : null;
         name = name || metadata.common.title || 'Unnamed Track';
       } catch (error) {
         console.error('Error extracting metadata:', error);
@@ -117,7 +122,10 @@ export class TrackService {
       return { filePath };
     } catch (error) {
       console.error('Error saving file:', error);
-      throw new HttpException('Failed to save file', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Failed to save file',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 

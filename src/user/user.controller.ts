@@ -58,7 +58,7 @@ export class UserController {
     if (!user) {
       throw new UnauthorizedException('User not authenticated');
     }
-    return this.userService.findUserById(user.id); // Use 'id' instead of 'userId'
+    return this.userService.getUserIdFromTokenSub(user.id);
   }
 
   @UseGuards(AuthGuard('jwt'))

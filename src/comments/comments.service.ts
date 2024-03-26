@@ -1,8 +1,11 @@
 import { Injectable, forwardRef } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Comment } from '@prisma/client';
+import { Comment, Marker } from '@prisma/client';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { MarkersService } from 'src/markers/markers.service';
+import { CreateCommentDto } from './dto/create-comment.dto';
+import { CreateCommentWithMarkerDto } from './dto/create-comment-with-marker.dto';
+import { UpdateCommentDto } from './dto/update-comment.dto';
 
 @Injectable()
 export class CommentsService {
@@ -25,8 +28,16 @@ export class CommentsService {
         orderBy: { createdAt: 'desc' },
         include: {
           user: { select: { name: true } },
-          // Ensure marker is included if exists
-          marker: true,
+          marker: {
+            select: {
+              id: true,
+              time: true,
+              commentId: true,
+              trackId: true,
+              createdAt: true,
+              waveSurferRegionID: true, // Include the waveSurferRegionID field
+            },
+          },
         },
       });
 
@@ -36,11 +47,8 @@ export class CommentsService {
         userName: comment.user!.name, // Asserting user is non-null
         marker: comment.marker
           ? {
-              id: comment.marker.id,
-              time: comment.marker.time,
-              commentId: comment.marker.commentId,
-              trackId: comment.marker.trackId,
-              createdAt: comment.marker.createdAt,
+            ...comment.marker,
+            waveSurferRegionID: comment.marker.waveSurferRegionID,
             }
           : null,
       }));
@@ -59,7 +67,6 @@ export class CommentsService {
     trackId: number,
     userId: number,
     content: string,
-    markerTime?: number,
   ): Promise<Comment> {
     if (!userId) {
       throw new Error('User ID is required to add a comment.');
@@ -79,83 +86,88 @@ export class CommentsService {
           trackId,
           userId,
           content,
-          // Conditionally create a marker if markerTime is provided
-          ...(markerTime !== undefined && {
-            marker: {
-              create: {
-                time: markerTime,
-                trackId, // Assuming the marker needs a reference to the track
-              },
-            },
-          }),
-        },
-        include: {
-          marker: true, // Include the marker data in the response
         },
       });
 
-      return comment;
+      return comment; // Return the created comment
     } catch (error) {
-      console.error('Error adding comment with marker:', error);
+      console.error('Error adding comment:', error);
       throw new HttpException(
         'Error adding comment',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
-
   async addCommentWithMarker(
-    trackId: number,
     userId: number,
-    content: string,
-    time: number,
-  ): Promise<Comment> {
-    // Construct an array to hold missing field names
-    const missingFields = [];
-    if (!userId) missingFields.push('userId');
-    if (!trackId) missingFields.push('trackId');
-    if (!content.trim()) missingFields.push('content');
-  
-    // Check if there are any missing fields
-    if (missingFields.length > 0) {
-      const missingFieldsMessage = `Missing required fields: ${missingFields.join(', ')}`;
-      console.error(missingFieldsMessage);
-      throw new HttpException(missingFieldsMessage, HttpStatus.BAD_REQUEST);
+    { trackId, content, time, waveSurferRegionID }: CreateCommentWithMarkerDto,
+  ): Promise<{ comment: Comment; marker: Marker }> {
+    console.log(
+      `Entering addCommentWithMarker for user ${userId} and track ${trackId}`,
+    );
+
+    const missingFieldNames = [];
+    if (!userId) missingFieldNames.push('userId');
+    if (!trackId) missingFieldNames.push('trackId');
+    if (!content.trim()) missingFieldNames.push('content');
+
+    if (missingFieldNames.length > 0) {
+      const errorMessage = `Missing required fields: ${missingFieldNames.join(
+        ', ',
+      )}`;
+      console.error(errorMessage);
+      throw new HttpException(errorMessage, HttpStatus.BAD_REQUEST);
     }
-  
-    // Verify the existence of related records
-    const trackExists = await this.prisma.track.findUnique({ where: { id: trackId } });
+
+    const trackExists = await this.prisma.track.findFirst({
+      where: { id: trackId },
+    });
     if (!trackExists) {
       throw new HttpException('Track does not exist', HttpStatus.BAD_REQUEST);
     }
-  
-    const userExists = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    const userExists = await this.prisma.user.findFirst({
+      where: { id: userId },
+    });
     if (!userExists) {
       throw new HttpException('User does not exist', HttpStatus.BAD_REQUEST);
     }
-  
-    // Proceed with creating the comment and marker
+
     try {
-      const comment = await this.prisma.comment.create({
-        data: {
-          trackId,
-          userId,
-          content,
-        },
+      const result = await this.prisma.$transaction(async (prisma) => {
+        const createdComment = await prisma.comment.create({
+          data: { trackId, userId, content },
+        });
+
+        const createdMarker = await prisma.marker.create({
+          data: {
+            time,
+            trackId,
+            commentId: createdComment.id,
+            waveSurferRegionID,
+          },
+        });
+
+        console.log('Created comment:', createdComment);
+        console.log('Created marker:', createdMarker);
+
+        return {
+          comment: createdComment,
+          marker: {
+            ...createdMarker,
+            waveSurferRegionID,
+          },
+        };
       });
-  
-      // Use the `createMarker` method from your markers service
-      await this.markersService.createMarker({
-        time,
-        trackId,
-        commentId: comment.id,
-      });
-  
-      return comment; // Return the created comment
+
+      console.log(
+        `Successfully added comment and marker for user ${userId} and track ${trackId}`,
+      );
+      return result;
     } catch (error) {
       console.error('Error adding comment with marker:', error);
       throw new HttpException(
-        'Error adding comment with marker',
+        'An error occurred while adding the comment with marker',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

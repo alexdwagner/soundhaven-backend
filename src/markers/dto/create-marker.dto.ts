@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
 
 export class CreateMarkerDto {
   @IsNumber()
@@ -12,4 +12,8 @@ export class CreateMarkerDto {
   @IsNumber()
   @IsNotEmpty()
   commentId: number;
+
+  @IsString()
+  @IsNotEmpty()
+  waveSurferRegionID: string;
 }
