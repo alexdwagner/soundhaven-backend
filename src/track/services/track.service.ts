@@ -1,10 +1,10 @@
 // src/track/track.service.ts
 
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, Artist, Album } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTrackDto } from './../dto/create-track.dto';
-import { UpdateTrackDto } from '../dto/update-track.dto';
+import { UpdateTrackMetadataDto } from '../dto/update-track-metadata.dto';
 import * as fs from 'fs/promises'; // Directly import fs/promises
 import * as path from 'path';
 import { Express } from 'express';
@@ -18,7 +18,12 @@ export class TrackService {
 
   async getAllTracks() {
     console.log('Service: Fetching all tracks');
-    return this.prisma.track.findMany();
+    return this.prisma.track.findMany({
+      include: {
+        artist: true,
+        album: true,
+      },
+    });
   }
 
   async getTrackById(id: string) {
@@ -27,95 +32,62 @@ export class TrackService {
     });
   }
 
-  async createTrack(createTrackDto: CreateTrackDto) {
-    // Check if properties are defined and parse them to integers, or provide default values
-    const duration =
-      createTrackDto.duration !== undefined
-        ? parseInt(createTrackDto.duration, 10)
-        : 0;
-    const albumId =
-      createTrackDto.albumId !== undefined
-        ? parseInt(createTrackDto.albumId, 10)
-        : null;
-    const artistId =
-      createTrackDto.artistId !== undefined
-        ? parseInt(createTrackDto.artistId, 10)
-        : null;
-
-    const trackData: Prisma.TrackCreateInput = {
-      name: createTrackDto.name || 'Unnamed Track',
-      duration, // Handled to be number or default 0
-      artist: artistId ? { connect: { id: artistId } } : undefined,
-      album: albumId ? { connect: { id: albumId } } : undefined,
-      filePath: createTrackDto.filePath,
-      genres:
-        createTrackDto.genres && createTrackDto.genres.length > 0
-          ? {
-              connect: createTrackDto.genres.map((genreId) => ({
-                id: genreId,
-              })),
-            }
-          : undefined,
-
-      playlists:
-        createTrackDto.playlists && createTrackDto.playlists.length > 0
-          ? {
-              connect: createTrackDto.playlists.map((playlistId) => ({
-                id: playlistId,
-              })),
-            }
-          : undefined,
-    };
-
-    return this.prisma.track.create({ data: trackData });
-  }
-
   async saveUploadedTrack(
     file: Express.Multer.File,
-    trackMetadata: CreateTrackDto,
+    name: string,
   ): Promise<{ filePath: string }> {
     const uploadPath = process.env.UPLOAD_PATH || 'uploads';
+
     // Ensure the directory exists
-    try {
-      await fs.mkdir(uploadPath, { recursive: true });
-    } catch (error) {
+    await fs.mkdir(uploadPath, { recursive: true }).catch((error) => {
       console.error('Could not create upload directory:', error);
-    }
+      throw new HttpException(
+        'Failed to create upload directory',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    });
 
     const filename = `${Date.now()}-${file.originalname}`;
     const filePath = path.join(uploadPath, filename);
 
-    // Save the file
     try {
+      // Save the file
       await fs.writeFile(filePath, file.buffer);
       console.log('File saved to:', filePath);
 
-      // Additional code to handle file metadata and save track info to DB...
-      let durationInSeconds: number | null = null;
-      let name = trackMetadata.name || 'Unnamed Track';
+      // Extract metadata for duration, artist, and album
+      const metadata = await musicMetadata.parseBuffer(
+        file.buffer,
+        file.mimetype,
+      );
+      const durationInSeconds = metadata.format.duration ?? 0;
+      const artistName = metadata.common.artist || 'Unknown Artist';
+      const albumName = metadata.common.album || 'Unknown Album';
 
-      // Try to extract duration from metadata
-      try {
-        const metadata = await musicMetadata.parseBuffer(
-          file.buffer,
-          file.mimetype || 'audio/mpeg',
-        );
-        durationInSeconds = metadata.format.duration
-          ? parseInt(metadata.format.duration.toString(), 10)
-          : null;
-        name = name || metadata.common.title || 'Unnamed Track';
-      } catch (error) {
-        console.error('Error extracting metadata:', error);
-      }
+      console.log('Extracted metadata:');
+      console.log('Duration:', durationInSeconds);
+      console.log('Artist:', artistName);
+      console.log('Album:', albumName);
 
-      const trackData = {
-        name,
-        duration: durationInSeconds || 0,
-        filePath,
-        // other properties
+      // Use helper functions to find or create artist and album based on extracted names
+      const artist = await this.findOrCreateArtist(artistName);
+      const album = await this.findOrCreateAlbum(albumName, artist?.id);
+
+      console.log('Found or created artist:', artist);
+      console.log('Found or created album:', album);
+
+      // Construct trackData with extracted metadata
+      const trackData: Prisma.TrackCreateInput = {
+        name: file.originalname, // Consider sanitizing or formatting
+        duration: durationInSeconds,
+        filePath: `${uploadPath}/${filename}`, // Ensure filePath is correctly formed
+        artist: artist ? { connect: { id: artist.id } } : undefined,
+        album: album ? { connect: { id: album.id } } : undefined,
+        // Handle genres and playlists if applicable
       };
 
-      // Save track data to DB
+      console.log('Track data to be saved:', trackData);
+
       const savedTrack = await this.prisma.track.create({ data: trackData });
       console.log('Track saved:', savedTrack);
 
@@ -127,6 +99,53 @@ export class TrackService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  // Helper method to reduce repetition for finding or creating artist/album
+  private async findOrCreateArtist(
+    artistName?: string,
+  ): Promise<Artist | null> {
+    if (!artistName) return null;
+    let artist = await this.prisma.artist.findFirst({
+      where: { name: artistName },
+    });
+    if (!artist) {
+      artist = await this.prisma.artist.create({
+        data: { name: artistName },
+      });
+    }
+    return artist;
+  }
+
+  private async findOrCreateAlbum(
+    albumName?: string,
+    artistId?: number,
+  ): Promise<Album | null> {
+    if (!albumName || !artistId) return null;
+    let album = await this.prisma.album.findFirst({
+      where: { name: albumName, artistId },
+    });
+    if (!album) {
+      album = await this.prisma.album.create({
+        data: {
+          name: albumName,
+          releaseDate: new Date(),
+          artist: { connect: { id: artistId } },
+        },
+      });
+    }
+    return album;
+  }
+
+  // Helper method for connecting genres and playlists
+  private connectIds(
+    ids?: number[],
+  ): { connect?: { id: number }[] } | undefined {
+    return ids && ids.length > 0
+      ? {
+          connect: ids.map((id) => ({ id })),
+        }
+      : undefined;
   }
 
   async deleteTrack(id: string) {
@@ -169,27 +188,96 @@ export class TrackService {
     }
   }
 
-  async updateTrack(id: string, updateTrackDto: UpdateTrackDto) {
+  async updateTrackMetadata(
+    id: string,
+    updateTrackMetadataDto: UpdateTrackMetadataDto,
+  ) {
+    console.log(`Starting update for track ID: ${id}`, updateTrackMetadataDto);
+
     try {
       const updateData: Prisma.TrackUpdateInput = {
-        name: updateTrackDto.name,
-        // Dynamically include fields only if they are provided
-        ...(updateTrackDto.artistId && {
-          artist: { connect: { id: Number(updateTrackDto.artistId) } },
-        }),
-        ...(updateTrackDto.albumId && {
-          album: { connect: { id: Number(updateTrackDto.albumId) } },
-        }),
+        name: updateTrackMetadataDto.name,
       };
 
-      return await this.prisma.track.update({
+      console.log('Initial update data:', updateData);
+
+      let artist: Artist | null = null;
+      if (updateTrackMetadataDto.artistName) {
+        console.log(
+          `Finding artist by name: ${updateTrackMetadataDto.artistName}`,
+        );
+
+        artist = await this.prisma.artist.findFirst({
+          where: { name: updateTrackMetadataDto.artistName },
+        });
+
+        if (!artist) {
+          console.log(
+            `Creating new artist with name: ${updateTrackMetadataDto.artistName}`,
+          );
+
+          artist = await this.prisma.artist.create({
+            data: { name: updateTrackMetadataDto.artistName },
+          });
+        }
+
+        console.log(`Artist found or created: ${artist.id}`);
+        updateData.artist = { connect: { id: artist.id } };
+      }
+
+      if (updateTrackMetadataDto.albumName) {
+        console.log(
+          `Finding or creating album with name: ${updateTrackMetadataDto.albumName} for artist ID: ${artist?.id}`,
+        );
+
+        // Only include artistId if it's actually available
+        const albumCreateData: any = {
+          name: updateTrackMetadataDto.albumName,
+          releaseDate: new Date(),
+        };
+
+        if (artist) {
+          albumCreateData.artistId = artist.id;
+        }
+
+        let album = await this.prisma.album.findFirst({
+          where: {
+            name: updateTrackMetadataDto.albumName,
+            ...(artist && { artistId: artist.id }), // Ensure artistId is only included if not undefined
+          },
+        });
+
+        if (!album) {
+          console.log(
+            `Creating new album with name: ${updateTrackMetadataDto.albumName}`,
+          );
+
+          album = await this.prisma.album.create({
+            data: albumCreateData,
+          });
+        }
+
+        console.log(`Album found or created: ${album.id}`);
+        updateData.album = { connect: { id: album.id } };
+      }
+
+      console.log('Final update data:', updateData);
+
+      const updatedTrack = await this.prisma.track.update({
         where: { id: Number(id) },
         data: updateData,
+        include: {
+          artist: true,
+          album: true,
+        },
       });
+
+      console.log(`Track updated successfully: ${updatedTrack.id}`);
+      return updatedTrack;
     } catch (error) {
-      console.error('Error updating track:', error);
+      console.error('Error updating track metadata:', error);
       throw new HttpException(
-        'Failed to update track',
+        'Failed to update track metadata',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

@@ -47,8 +47,8 @@ export class CommentsService {
         userName: comment.user!.name, // Asserting user is non-null
         marker: comment.marker
           ? {
-            ...comment.marker,
-            waveSurferRegionID: comment.marker.waveSurferRegionID,
+              ...comment.marker,
+              waveSurferRegionID: comment.marker.waveSurferRegionID,
             }
           : null,
       }));
@@ -98,6 +98,7 @@ export class CommentsService {
       );
     }
   }
+
   async addCommentWithMarker(
     userId: number,
     { trackId, content, time, waveSurferRegionID }: CreateCommentWithMarkerDto,

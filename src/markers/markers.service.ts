@@ -15,6 +15,7 @@ export class MarkersService {
   }
 
   async createMarker(createMarkerDto: CreateMarkerDto): Promise<Marker> {
+    console.log('Creating marker log from createMarkerDto:', createMarkerDto);
     return this.prisma.marker.create({
       data: {
         time: createMarkerDto.time,
