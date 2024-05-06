@@ -143,47 +143,43 @@ export class TrackService {
   ): { connect?: { id: number }[] } | undefined {
     return ids && ids.length > 0
       ? {
-          connect: ids.map((id) => ({ id })),
-        }
+        connect: ids.map((id) => ({ id })),
+      }
       : undefined;
   }
 
-  async deleteTrack(id: string) {
+  async deleteTrack(id: string): Promise<{ message: string }> {
     console.log(`Attempting to delete track with ID: ${id}`);
     const trackIdNumber = Number(id);
 
-    // Check if the track exists
-    const track = await this.prisma.track.findUnique({
-      where: { id: trackIdNumber },
-    });
-
-    if (!track) {
-      console.log(`Track with ID ${id} not found.`);
-      throw new HttpException('Track not found', HttpStatus.NOT_FOUND);
-    }
-
-    // Delete related records in TracksInPlaylist and TracksInGenre
-    await this.prisma.tracksInPlaylist.deleteMany({
-      where: { trackId: trackIdNumber },
-    });
-    await this.prisma.tracksInGenre.deleteMany({
-      where: { trackId: trackIdNumber },
-    });
-
     try {
+      // 1. Check if the track exists
+      const track = await this.prisma.track.findUnique({
+        where: { id: trackIdNumber },
+      });
+
+      if (!track) {
+        throw new HttpException('Track not found', HttpStatus.NOT_FOUND);
+      }
+
+      // 2. Perform cascading deletions in sequence
+      await this.deleteAssociatedMarkers(trackIdNumber);
+      await this.deleteAssociatedComments(trackIdNumber);
+      await this.deleteFromPlaylists(trackIdNumber);
+      await this.deleteFromGenres(trackIdNumber);
+
+      // 3. Delete the track itself
       await this.prisma.track.delete({
         where: { id: trackIdNumber },
       });
+
       console.log(`Track with ID ${id} deleted successfully.`);
       return { message: 'Track deleted successfully' };
     } catch (error) {
-      console.error(
-        `Error occurred while deleting track with ID ${id}:`,
-        error,
-      );
+      console.error(`Error occurred while deleting track with ID ${id}:`, error);
       throw new HttpException(
         'Internal server error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
   }
@@ -281,5 +277,22 @@ export class TrackService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  // Helper functions for deletion operations
+  private async deleteAssociatedMarkers(trackId: number) {
+    await this.prisma.marker.deleteMany({ where: { trackId } });
+  }
+
+  private async deleteAssociatedComments(trackId: number) {
+    await this.prisma.comment.deleteMany({ where: { trackId } });
+  }
+
+  private async deleteFromPlaylists(trackId: number) {
+    await this.prisma.tracksInPlaylist.deleteMany({ where: { trackId } });
+  }
+
+  private async deleteFromGenres(trackId: number) {
+    await this.prisma.tracksInGenre.deleteMany({ where: { trackId } });
   }
 }
