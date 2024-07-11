@@ -5,11 +5,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
 import * as express from 'express';
+import { ConfigService } from './config/config.service';
 
 dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
 
   app.enableCors(); // Enables CORS for all origins
 
@@ -23,7 +25,6 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  // Enhanced ValidationPipe configuration
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -32,11 +33,16 @@ async function bootstrap() {
     }),
   );
 
-  const uploadsPath = join(__dirname, '..', 'uploads');
+  const uploadsPath = configService.fullUploadPath;
   console.log(`Serving static files from: ${uploadsPath}`);
   app.use('/uploads', express.static(uploadsPath));
 
-  const port = process.env.PORT || 3122;
+  // Serve static files from the public directory
+  const publicPath = join(__dirname, '..', 'public');
+  console.log(`Serving public files from: ${publicPath}`);
+  app.use('/public', express.static(publicPath));
+
+  const port = configService.port;
   await app.listen(port);
   console.log(`Application is running on: ${await app.getUrl()}`);
 }

@@ -21,6 +21,9 @@ model User {
   followedArtists Artist[]       @relation("UserFollowsArtist")
   refreshTokens   RefreshToken[]
   comments Comment[]
+  tracks          Track[]
+  trackAccesses   TrackAccess[]
+  playlistAccesses PlaylistAccess[]
 }
 
 // For storing refresh tokens
@@ -63,6 +66,8 @@ model Track {
   artist           Artist? @relation(fields: [artistId], references: [id])
   albumId          Int?
   album            Album?             @relation(fields: [albumId], references: [id])
+  userId           Int                
+  user             User               @relation(fields: [userId], references: [id])
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   playlists        Playlist[]         @relation("TracksInPlaylist")
@@ -72,6 +77,17 @@ model Track {
   filePath String?
   comments Comment[]
   markers Marker[]
+  trackAccess      TrackAccess[]
+}
+
+// Track access model
+model TrackAccess {
+  userId      Int
+  trackId     Int
+  permission  String    // e.g., 'read', 'edit'
+  user        User      @relation(fields: [userId], references: [id])
+  track       Track     @relation(fields: [trackId], references: [id])
+  @@id([userId, trackId])
 }
 
 // Playlist model
@@ -83,6 +99,17 @@ model Playlist {
   user             User               @relation(fields: [userId], references: [id])
   tracks           Track[]            @relation("TracksInPlaylist")
   TracksInPlaylist TracksInPlaylist[]
+  playlistAccess   PlaylistAccess[]
+}
+
+// Playlist access model
+model PlaylistAccess {
+  userId        Int
+  playlistId    Int
+  permission    String    // e.g., 'read', 'edit'
+  user          User      @relation(fields: [userId], references: [id])
+  playlist      Playlist  @relation(fields: [playlistId], references: [id])
+  @@id([userId, playlistId])
 }
 
 // Genre model
@@ -119,8 +146,8 @@ model TracksInGenre {
 model Comment {
   id        Int      @id @default(autoincrement())
   content   String
-  trackId   Int
-  track   Track @relation(fields: [trackId], references: [id], onDelete: Cascade) 
+  trackId   Int?
+  track   Track? @relation(fields: [trackId], references: [id], onDelete: Cascade) 
   userId    Int
   user      User    @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
@@ -136,7 +163,7 @@ model Marker {
   time      Float    // Time in the track (e.g., in seconds)
   commentId Int     @unique // Ensure uniqueness to maintain one-to-one relationship
   comment   Comment @relation(fields: [commentId], references: [id])
-  trackId   Int
-  track     Track    @relation(fields: [trackId], references: [id])
+  trackId   Int?
+  track     Track?    @relation(fields: [trackId], references: [id])
   createdAt DateTime @default(now())
 }

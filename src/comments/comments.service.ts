@@ -103,13 +103,22 @@ export class CommentsService {
     userId: number,
     { trackId, content, time, waveSurferRegionID }: CreateCommentWithMarkerDto,
   ): Promise<{ comment: Comment; marker: Marker }> {
+    console.log('Received data:', {
+      userId,
+      trackId,
+      content,
+      time,
+      waveSurferRegionID,
+    });
     console.log(
       `Entering addCommentWithMarker for user ${userId} and track ${trackId}`,
     );
 
+    const DEFAULT_TRACK_ID = -1; // Make sure this matches the frontend value
+
     const missingFieldNames = [];
     if (!userId) missingFieldNames.push('userId');
-    if (!trackId) missingFieldNames.push('trackId');
+    if (trackId === undefined) missingFieldNames.push('trackId');
     if (!content.trim()) missingFieldNames.push('content');
 
     if (missingFieldNames.length > 0) {
@@ -120,14 +129,7 @@ export class CommentsService {
       throw new HttpException(errorMessage, HttpStatus.BAD_REQUEST);
     }
 
-    const trackExists = await this.prisma.track.findFirst({
-      where: { id: trackId },
-    });
-    if (!trackExists) {
-      throw new HttpException('Track does not exist', HttpStatus.BAD_REQUEST);
-    }
-
-    const userExists = await this.prisma.user.findFirst({
+    const userExists = await this.prisma.user.findUnique({
       where: { id: userId },
     });
     if (!userExists) {
@@ -135,38 +137,71 @@ export class CommentsService {
     }
 
     try {
-      const result = await this.prisma.$transaction(async (prisma) => {
-        const createdComment = await prisma.comment.create({
-          data: { trackId, userId, content },
+      let result;
+
+      if (trackId === DEFAULT_TRACK_ID) {
+        console.log('Adding comment to default track');
+        result = await this.prisma.$transaction(async (prisma) => {
+          const defaultComment = await prisma.comment.create({
+            data: {
+              content,
+              userId,
+            },
+          });
+
+          const defaultMarker = await prisma.marker.create({
+            data: {
+              time,
+              waveSurferRegionID,
+              commentId: defaultComment.id,
+              trackId: null, // No associated track in the database
+            },
+          });
+
+          return {
+            comment: defaultComment,
+            marker: defaultMarker,
+          };
         });
-
-        const createdMarker = await prisma.marker.create({
-          data: {
-            time,
-            trackId,
-            commentId: createdComment.id,
-            waveSurferRegionID,
-          },
+      } else {
+        const trackExists = await this.prisma.track.findUnique({
+          where: { id: trackId },
         });
+        if (!trackExists) {
+          throw new HttpException(
+            'Track does not exist',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
 
-        console.log('Created comment:', createdComment);
-        console.log('Created marker:', createdMarker);
+        result = await this.prisma.$transaction(async (prisma) => {
+          const createdComment = await prisma.comment.create({
+            data: { trackId, userId, content },
+          });
 
-        return {
-          comment: createdComment,
-          marker: {
-            ...createdMarker,
-            waveSurferRegionID,
-          },
-        };
-      });
+          const createdMarker = await prisma.marker.create({
+            data: {
+              time,
+              trackId,
+              commentId: createdComment.id,
+              waveSurferRegionID,
+            },
+          });
 
-      console.log(
-        `Successfully added comment and marker for user ${userId} and track ${trackId}`,
-      );
+          return {
+            comment: createdComment,
+            marker: createdMarker,
+          };
+        });
+      }
+
+      console.log('Created comment:', result.comment);
+      console.log('Created marker:', result.marker);
+      console.log('Final result:', result);
+
       return result;
     } catch (error) {
-      console.error('Error adding comment with marker:', error);
+      console.error('Detailed error in addCommentWithMarker:', error);
       throw new HttpException(
         'An error occurred while adding the comment with marker',
         HttpStatus.INTERNAL_SERVER_ERROR,

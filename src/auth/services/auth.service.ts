@@ -17,10 +17,8 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  private sanitizeUser(user: User) {
-    // Omit sensitive fields like password
-    const { password, ...sanitized } = user;
-
+  private sanitizeUser(user: Omit<User, 'password'>) {
+    const sanitized = { ...user };
     return sanitized;
   }
 
@@ -43,20 +41,15 @@ export class AuthService {
   }
 
   async login(user: Omit<User, 'password'>) {
-    // Assuming user validation has already occurred to reach this point
     const accessToken = await this.generateAccessToken(user);
     const refreshToken = await this.generateRefreshToken(user);
-    // Directly after login, token validation might not be necessary as mentioned
-    // But if you need to validate for some reason:
-    const validationResponse = await this.validateToken(accessToken);
-    if (!validationResponse.isValid) {
-      throw new UnauthorizedException('Token validation failed post-login');
-    }
-    // Proceed with login response
+
+    console.log(`User ${user.id} logged in successfully`);
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
-      user, // Ensure this is the expected user object structure
+      user: this.sanitizeUser(user),
     };
   }
 
@@ -74,39 +67,20 @@ export class AuthService {
     });
   }
 
-  // This method should validate the JWT token and return user details if valid
-  async validateToken(
-    token: string,
-  ): Promise<{ isValid: boolean; user?: any }> {
-    console.log('AuthService.validateToken - Entered');
+  async validateToken(token: string): Promise<{ isValid: boolean; user?: any }> {
     try {
-      console.log('Decoding token:', token);
       const decoded = this.jwtService.verify(token, {
         secret: process.env.ACCESS_TOKEN_SECRET,
-      }); // Ensure you're using the correct secret
+      });
 
-      console.log(
-        'ACCESS_TOKEN_SECRET (validation):',
-        process.env.ACCESS_TOKEN_SECRET,
-      ); // Add this logging
-
-      // console.log('Decoded token:', decoded);
-
-      const userId = decoded.sub;
-      if (!userId) {
-        return { isValid: false };
-      }
-
-      const user = await this.userService.getUserIdFromTokenSub(userId);
-      // console.log('User fetched from token sub:', user); // Log the fetched user
+      const user = await this.userService.getUserIdFromTokenSub(decoded.sub);
 
       if (!user) {
+        console.log(`No user found for token sub: ${decoded.sub}`);
         return { isValid: false };
       }
 
-      // Exclude password and other sensitive fields
-      const { password, ...userWithoutPassword } = user;
-      return { isValid: true, user: userWithoutPassword };
+      return { isValid: true, user: this.sanitizeUser(user) };
     } catch (error) {
       console.error('Error validating token:', error);
       return { isValid: false };
@@ -132,9 +106,13 @@ export class AuthService {
   }
 
   async refreshAccessToken(refreshToken: string) {
+    console.log('Refreshing token:', refreshToken);
+
     const storedToken = await this.prisma.refreshToken.findUnique({
       where: { token: refreshToken },
     });
+
+    console.log('Stored token found:', storedToken);
 
     if (!storedToken || new Date() > storedToken.expiresIn) {
       throw new UnauthorizedException('Invalid or expired refresh token.');
@@ -144,48 +122,57 @@ export class AuthService {
       where: { id: storedToken.userId },
     });
 
+    console.log('User found:', user?.id);
+
     if (!user) {
       throw new UnauthorizedException(
         'User not found for the provided refresh token.',
       );
     }
 
-    return this.jwtService.sign(
+    // Generate new access token
+    const newAccessToken = this.jwtService.sign(
       { email: user.email, sub: user.id },
       {
-        secret: process.env.ACCESS_TOKEN_SECRET, // Use ACCESS_TOKEN_SECRET here
+        secret: process.env.ACCESS_TOKEN_SECRET,
+        expiresIn: '360m', // or whatever expiration time you prefer
       },
     );
+
+    console.log('New access token generated');
+
+    // Generate new refresh token (implement refresh token rotation)
+    const newRefreshToken = await this.generateRefreshToken(user);
+
+    console.log('New refresh token generated');
+
+    // Invalidate old refresh token
+    await this.prisma.refreshToken.delete({
+      where: { token: refreshToken },
+    });
+
+    console.log('Old refresh token invalidated');
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    };
   }
 
   async revokeRefreshToken(token: string) {
     try {
-      // Log to indicate the search for the existing token
-      console.log(`Looking up refresh token: ${token}`);
-
-      const existingToken = await this.prisma.refreshToken.findUnique({
+      const result = await this.prisma.refreshToken.deleteMany({
         where: { token },
       });
 
-      // Log to warn if token not found and return early
-      if (!existingToken) {
+      if (result.count > 0) {
+        console.log('Refresh token revoked:', token);
+      } else {
         console.warn('Refresh token not found for revocation:', token);
-        return;
       }
-
-      // Log to indicate the deletion of the token
-      console.log(`Deleting refresh token: ${token}`);
-      await this.prisma.refreshToken.delete({
-        where: { token },
-      });
-
-      // Log to confirm successful revocation
-      console.log('Refresh token revoked:', token);
     } catch (error) {
       console.error('Error revoking refresh token:', error);
-      throw new Error(
-        `Failed to revoke refresh token. Details: ${error.message}`,
-      );
+      throw new Error(`Failed to revoke refresh token. Details: ${error.message}`);
     }
   }
 }

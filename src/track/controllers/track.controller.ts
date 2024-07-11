@@ -18,23 +18,33 @@ import {
 import { TrackService } from '../services/track.service';
 import { CreateTrackDto } from '../dto/create-track.dto';
 import { UpdateTrackMetadataDto } from '../dto/update-track-metadata.dto';
-import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { GetUser } from 'src/decorators/get-user.decorator';
+import { User } from '@prisma/client';
+import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
 
 @Controller('tracks')
+@UseGuards(JwtAuthGuard)
 export class TrackController {
   constructor(private readonly trackService: TrackService) {}
 
   @Get(':id')
-  async getTrackById(@Param('id') id: string) {
-    return this.trackService.getTrackById(id);
+  async getTrackById(@Param('id') id: string, @GetUser() user: User) {
+    return this.trackService.getTrackById(id, user.id);
   }
 
   @Get()
-  async getAllTracks() {
+  @UseGuards(JwtAuthGuard)
+  async getAllTracks(@GetUser() user: User) {
+    console.log('User ID from token:', user.id);
+    // console.log('getAllTracks: Received request');
+    // console.log('User from request:', req.user);
+
     try {
-      return this.trackService.getAllTracks();
+      const tracks = await this.trackService.getAllTracks(user.id);
+      console.log(`Fetched ${tracks.length} tracks for user ${user.id}`);
+      return tracks;
     } catch (error) {
       console.error('Error fetching tracks:', error);
       throw new HttpException(
@@ -45,17 +55,18 @@ export class TrackController {
   }
 
   @Post('upload')
-  // @UseGuards(AuthGuard('jwt')) // Uncomment as necessary
   @UseInterceptors(FileInterceptor('file'))
   async uploadTrack(
     @UploadedFile() file: Express.Multer.File,
     @Body('name') name: string,
+    @GetUser() user: User
   ): Promise<{ message: string; filePath?: string }> {
     try {
       console.log(`Upload request received with file: ${file?.originalname}`);
       const { filePath } = await this.trackService.saveUploadedTrack(
         file,
         name,
+        user.id,
       );
 
       console.log(`File uploaded successfully: ${filePath}`);
@@ -70,15 +81,16 @@ export class TrackController {
   }
 
   @Delete(':id')
-  async deleteTrack(@Param('id') id: string) {
+  async deleteTrack(@Param('id') id: string, @GetUser() user: User) {
     console.log('Deleting track with ID:', id);
-    return this.trackService.deleteTrack(id);
+    return this.trackService.deleteTrack(id, user.id);
   }
 
   @Patch(':id')
   async updateTrackMetadata(
     @Param('id') id: string,
     @Body() updateTrackDto: UpdateTrackMetadataDto,
+    @GetUser() user: User
   ) {
     console.log(`Received update for track ${id}:`, updateTrackDto);
     try {
@@ -96,6 +108,7 @@ export class TrackController {
       const updatedTrack = await this.trackService.updateTrackMetadata(
         id,
         updateTrackDto,
+        user.id,
       );
       if (!updatedTrack) {
         throw new HttpException('Track not found', HttpStatus.NOT_FOUND);

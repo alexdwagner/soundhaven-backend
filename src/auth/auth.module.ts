@@ -12,14 +12,21 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { UserModule } from 'src/user/user.module';
 import { AuthController } from './controllers/auth.controller';
 import { AuthMiddleware } from './middleware/auth.middleware';
+import { ConfigService } from '../config/config.service';
+import { ConfigModule } from '../config/config.module';
 
 @Module({
   imports: [
     UserModule,
     PassportModule,
-    JwtModule.register({
-      secret: process.env.ACCESS_TOKEN_SECRET, // Use ACCESS_TOKEN_SECRET for JWT signing
-      signOptions: { expiresIn: '60m' }, // Set a shorter expiration for access tokens
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.accessTokenSecret,
+        signOptions: { expiresIn: configService.jwtExpirationTime },
+      }),
+      inject: [ConfigService],
     }),
   ],
   providers: [AuthService, JwtStrategy, PrismaService],

@@ -9,9 +9,11 @@ import { ArtistModule } from './artist/artist.module';
 import { AlbumModule } from './album/album.module';
 import { CommentsModule } from './comments/comments.module';
 import { MarkersModule } from './markers/markers.module';
+import { ConfigModule } from './config/config.module';
 
 @Module({
   imports: [
+    ConfigModule,
     TrackModule,
     PlaylistModule,
     AuthModule,

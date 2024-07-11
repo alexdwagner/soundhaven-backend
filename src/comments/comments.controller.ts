@@ -10,6 +10,8 @@ import {
   Param,
   BadRequestException,
   UnauthorizedException,
+  NotFoundException,
+  InternalServerErrorException,
   HttpException,
   HttpStatus,
   ParseIntPipe,
@@ -74,9 +76,9 @@ export class CommentsController {
   ): Promise<{ comment: Comment; marker: Marker }> {
     console.log('Request User:', req.user);
     console.log('Request Body:', createCommentWithMarkerDto);
-    // Enhanced Error Handling
+
     if (!req.user) {
-      throw new UnauthorizedException('User not authenticated'); // Or appropriate error
+      throw new UnauthorizedException('User not authenticated');
     }
 
     // Convert to number
@@ -92,12 +94,13 @@ export class CommentsController {
         createCommentWithMarkerDto,
       );
       console.log('Response from Service:', result);
-      return result; // Assuming the service returns an object {comment, marker}
+      return result;
     } catch (error) {
-      throw new HttpException(
-        'Failed to add comment with marker',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      console.error('Error in addCommentWithMarker:', error);
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to add comment with marker');
     }
   }
 

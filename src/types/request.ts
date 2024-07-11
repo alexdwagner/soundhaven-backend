@@ -1,9 +1,8 @@
-// src/types/request.ts
 import { Request } from 'express';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
-    id: string; // Keep as string
+    id: string;
     email: string;
     name?: string;
   };

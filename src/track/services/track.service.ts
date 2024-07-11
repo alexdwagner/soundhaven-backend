@@ -1,7 +1,7 @@
 // src/track/track.service.ts
 
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { Prisma, Artist, Album } from '@prisma/client';
+import { Prisma, Artist, Album, Track } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTrackDto } from './../dto/create-track.dto';
 import { UpdateTrackMetadataDto } from '../dto/update-track-metadata.dto';
@@ -9,16 +9,21 @@ import * as fs from 'fs/promises'; // Directly import fs/promises
 import * as path from 'path';
 import { Express } from 'express';
 import * as musicMetadata from 'music-metadata';
+import { ConfigService } from '../../config/config.service';
 
 @Injectable()
 export class TrackService {
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+  ) {
     console.log('TrackService instantiated');
   }
 
-  async getAllTracks() {
-    console.log('Service: Fetching all tracks');
+  async getAllTracks(userId: number) {
+    console.log('Service: Fetching all tracks for user', userId);
     return this.prisma.track.findMany({
+      where: { userId } as Prisma.TrackWhereInput, // Ensure tracks are fetched only for the logged-in user
       include: {
         artist: true,
         album: true,
@@ -26,17 +31,18 @@ export class TrackService {
     });
   }
 
-  async getTrackById(id: string) {
-    return this.prisma.track.findUnique({
-      where: { id: Number(id) },
+  async getTrackById(id: string, userId: number) {
+    return this.prisma.track.findFirst({
+      where: { id: Number(id), userId },
     });
   }
 
   async saveUploadedTrack(
     file: Express.Multer.File,
     name: string,
+    userId: number
   ): Promise<{ filePath: string }> {
-    const uploadPath = process.env.UPLOAD_PATH || 'uploads';
+    const uploadPath = this.configService.uploadPath;
 
     // Ensure the directory exists
     await fs.mkdir(uploadPath, { recursive: true }).catch((error) => {
@@ -83,6 +89,7 @@ export class TrackService {
         filePath: `${uploadPath}/${filename}`, // Ensure filePath is correctly formed
         artist: artist ? { connect: { id: artist.id } } : undefined,
         album: album ? { connect: { id: album.id } } : undefined,
+        user: { connect: { id: userId } }
         // Handle genres and playlists if applicable
       };
 
@@ -148,14 +155,14 @@ export class TrackService {
       : undefined;
   }
 
-  async deleteTrack(id: string): Promise<{ message: string }> {
+  async deleteTrack(id: string, userId: number): Promise<{ message: string }> {
     console.log(`Attempting to delete track with ID: ${id}`);
     const trackIdNumber = Number(id);
 
     try {
       // 1. Check if the track exists
       const track = await this.prisma.track.findUnique({
-        where: { id: trackIdNumber },
+        where: { id: trackIdNumber, userId },
       });
 
       if (!track) {
@@ -187,6 +194,7 @@ export class TrackService {
   async updateTrackMetadata(
     id: string,
     updateTrackMetadataDto: UpdateTrackMetadataDto,
+    userId: number,
   ) {
     console.log(`Starting update for track ID: ${id}`, updateTrackMetadataDto);
 
@@ -260,7 +268,7 @@ export class TrackService {
       console.log('Final update data:', updateData);
 
       const updatedTrack = await this.prisma.track.update({
-        where: { id: Number(id) },
+        where: { id: Number(id), userId },
         data: updateData,
         include: {
           artist: true,

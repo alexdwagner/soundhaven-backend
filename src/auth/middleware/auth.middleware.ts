@@ -13,7 +13,7 @@ export class AuthMiddleware implements NestMiddleware {
   constructor(private authService: AuthService) {}
 
   async use(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    console.log('AuthMiddleware - entered middleware'); // Add this logging
+    console.log('AuthMiddleware - entered middleware');
 
     const authHeader = req.headers.authorization;
     if (!authHeader) {
