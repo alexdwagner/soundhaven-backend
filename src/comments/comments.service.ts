@@ -101,7 +101,13 @@ export class CommentsService {
 
   async addCommentWithMarker(
     userId: number,
-    { trackId, content, time, waveSurferRegionID }: CreateCommentWithMarkerDto,
+    {
+      trackId,
+      content,
+      time,
+      duration,
+      waveSurferRegionID,
+    }: CreateCommentWithMarkerDto,
   ): Promise<{ comment: Comment; marker: Marker }> {
     console.log('Received data:', {
       userId,
@@ -152,9 +158,10 @@ export class CommentsService {
           const defaultMarker = await prisma.marker.create({
             data: {
               time,
+              duration,
               waveSurferRegionID,
               commentId: defaultComment.id,
-              trackId: null, // No associated track in the database
+              trackId: null,
             },
           });
 
@@ -182,6 +189,7 @@ export class CommentsService {
           const createdMarker = await prisma.marker.create({
             data: {
               time,
+              duration,
               trackId,
               commentId: createdComment.id,
               waveSurferRegionID,

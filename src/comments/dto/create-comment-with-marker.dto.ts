@@ -8,7 +8,10 @@ export class CreateCommentWithMarkerDto {
   trackId: number;
 
   @IsNumber()
-  time: number; // Assuming this is the marker time
+  time: number;
+
+  @IsNumber()
+  duration: number;
 
   @IsNotEmpty()
   waveSurferRegionID: string;

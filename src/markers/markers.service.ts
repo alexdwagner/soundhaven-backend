@@ -19,6 +19,7 @@ export class MarkersService {
     return this.prisma.marker.create({
       data: {
         time: createMarkerDto.time,
+        duration: createMarkerDto.duration,
         trackId: createMarkerDto.trackId,
         commentId: createMarkerDto.commentId,
         waveSurferRegionID: createMarkerDto.waveSurferRegionID,
@@ -40,6 +41,7 @@ export class MarkersService {
       where: { id: Number(id) },
       data: {
         time: updateMarkerDto.start,
+        duration: updateMarkerDto.duration,
         trackId: updateMarkerDto.trackId,
         commentId: updateMarkerDto.commentId,
       },

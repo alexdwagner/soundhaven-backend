@@ -7,6 +7,10 @@ export class CreateMarkerDto {
 
   @IsNumber()
   @IsNotEmpty()
+  duration: number;
+
+  @IsNumber()
+  @IsNotEmpty()
   trackId: number;
 
   @IsNumber()

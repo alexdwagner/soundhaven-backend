@@ -161,6 +161,7 @@ model Marker {
   id        Int      @id @default(autoincrement())
   waveSurferRegionID String
   time      Float    // Time in the track (e.g., in seconds)
+  duration           Float    // Duration of the marker (in seconds)
   commentId Int     @unique // Ensure uniqueness to maintain one-to-one relationship
   comment   Comment @relation(fields: [commentId], references: [id])
   trackId   Int?
