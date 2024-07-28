@@ -23,6 +23,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { GetUser } from 'src/decorators/get-user.decorator';
 import { User } from '@prisma/client';
 import { JwtAuthGuard } from '../../guards/jwt-auth.guard';
+import { Multer } from 'multer';
 
 @Controller('tracks')
 @UseGuards(JwtAuthGuard)

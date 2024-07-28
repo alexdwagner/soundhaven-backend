@@ -10,6 +10,8 @@ import { AlbumModule } from './album/album.module';
 import { CommentsModule } from './comments/comments.module';
 import { MarkersModule } from './markers/markers.module';
 import { ConfigModule } from './config/config.module';
+import { AllExceptionsFilter } from './filters/all-exceptions.filter';
+import { APP_FILTER } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -23,6 +25,13 @@ import { ConfigModule } from './config/config.module';
     MarkersModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService],
+  providers: [
+    AppService,
+    PrismaService,
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
+    },
+  ],
 })
 export class AppModule {}

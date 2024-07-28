@@ -20,7 +20,7 @@ model User {
   playlists       Playlist[]
   followedArtists Artist[]       @relation("UserFollowsArtist")
   refreshTokens   RefreshToken[]
-  comments Comment[]
+  comments        Comment[]
   tracks          Track[]
   trackAccesses   TrackAccess[]
   playlistAccesses PlaylistAccess[]
@@ -60,10 +60,10 @@ model Album {
 // Track model
 model Track {
   id               Int                @id @default(autoincrement())
-  name             String   @db.VarChar(255)  
-  duration         Int // Duration in seconds
+  name             String             @db.VarChar(255)  
+  duration         Int                // Duration in seconds
   artistId         Int?
-  artist           Artist? @relation(fields: [artistId], references: [id])
+  artist           Artist?            @relation(fields: [artistId], references: [id])
   albumId          Int?
   album            Album?             @relation(fields: [albumId], references: [id])
   userId           Int                
@@ -74,9 +74,9 @@ model Track {
   genres           Genre[]            @relation("TracksInGenre")
   TracksInPlaylist TracksInPlaylist[]
   TracksInGenre    TracksInGenre[]
-  filePath String?
-  comments Comment[]
-  markers Marker[]
+  filePath         String?
+  comments         Comment[]
+  markers          Marker[]
   trackAccess      TrackAccess[]
 }
 
@@ -96,9 +96,10 @@ model Playlist {
   name            String
   description      String?
   userId           Int
+  order            Int                @default(0)
   user             User               @relation(fields: [userId], references: [id])
-  tracks           Track[]            @relation("TracksInPlaylist")
   TracksInPlaylist TracksInPlaylist[]
+  tracks           Track[]            @relation("TracksInPlaylist")
   playlistAccess   PlaylistAccess[]
 }
 
@@ -106,7 +107,7 @@ model Playlist {
 model PlaylistAccess {
   userId        Int
   playlistId    Int
-  permission    String    // e.g., 'read', 'edit'
+  permission    String
   user          User      @relation(fields: [userId], references: [id])
   playlist      Playlist  @relation(fields: [playlistId], references: [id])
   @@id([userId, playlistId])
@@ -122,12 +123,11 @@ model Genre {
 
 // Many-to-Many relation between Tracks and Playlists
 model TracksInPlaylist {
-  track   Track @relation(fields: [trackId], references: [id])
-  trackId Int
-
-  playlist   Playlist @relation(fields: [playlistId], references: [id])
-  playlistId Int
-
+  trackId     Int
+  playlistId  Int
+  order       Int
+  track       Track     @relation(fields: [trackId], references: [id])
+  playlist    Playlist  @relation(fields: [playlistId], references: [id])
   @@id([trackId, playlistId])
 }
 

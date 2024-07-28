@@ -18,9 +18,10 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@/types/*": ["src/types/*"]
-      // Define other aliases here
+      "@/*": ["*"]
     },
-    "typeRoots": ["./node_modules/@types", "./src/types"]
-  }
+    "typeRoots": ["../node_modules/@types", "./types"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
 }

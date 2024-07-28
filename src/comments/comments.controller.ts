@@ -21,7 +21,8 @@ import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreateCommentWithMarkerDto } from './dto/create-comment-with-marker.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
-import { AuthenticatedRequest } from '@/types/request';
+import { AuthenticatedRequest } from '../types/request';
+
 // Create JWTAuthGuard
 
 @Controller('comments')

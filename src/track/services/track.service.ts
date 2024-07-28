@@ -40,7 +40,7 @@ export class TrackService {
   async saveUploadedTrack(
     file: Express.Multer.File,
     name: string,
-    userId: number
+    userId: number,
   ): Promise<{ filePath: string }> {
     const uploadPath = this.configService.uploadPath;
 

@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
 import * as express from 'express';
@@ -10,8 +10,12 @@ import { ConfigService } from './config/config.service';
 dotenv.config();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+  });
+
   const configService = app.get(ConfigService);
+  const logger = new Logger('Bootstrap');
 
   app.enableCors(); // Enables CORS for all origins
 
@@ -34,17 +38,17 @@ async function bootstrap() {
   );
 
   const uploadsPath = configService.fullUploadPath;
-  console.log(`Serving static files from: ${uploadsPath}`);
+  logger.log(`Serving static files from: ${uploadsPath}`);
   app.use('/uploads', express.static(uploadsPath));
 
   // Serve static files from the public directory
   const publicPath = join(__dirname, '..', 'public');
-  console.log(`Serving public files from: ${publicPath}`);
+  logger.log(`Serving public files from: ${publicPath}`);
   app.use('/public', express.static(publicPath));
 
   const port = configService.port;
   await app.listen(port);
-  console.log(`Application is running on: ${await app.getUrl()}`);
+  logger.log(`Application is running on: ${await app.getUrl()}`);
 }
 
 bootstrap();
